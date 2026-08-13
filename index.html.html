@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Auspex — Live Signal Feed</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #12131C;
+    --surface: #1B1D2B;
+    --line: #2C2E42;
+    --gold: #C9A15A;
+    --goldDim: #8A7248;
+    --teal: #5FA88F;
+    --rust: #B5533C;
+    --text: #E7E4D8;
+    --textDim: #8B8AA0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    padding-bottom: 3rem;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .display { font-family: 'Cinzel', serif; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 1.5rem; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; }
+  .panel.gold-border { border: 1px solid var(--gold); }
+  .panel-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; }
+  .panel-title { font-size: 1.05rem; font-weight: 600; color: var(--gold); }
+  .panel-title.lg { font-size: 1.15rem; font-weight: 700; }
+  .panel-sub { font-size: 0.68rem; color: var(--textDim); margin-top: 0.2rem; max-width: 560px; line-height: 1.5; }
+  .btn-ghost {
+    background: transparent; color: var(--gold); border: 1px solid var(--goldDim);
+    border-radius: 5px; padding: 0.3rem 0.6rem; font-size: 0.7rem; font-weight: 700;
+    cursor: pointer; letter-spacing: 0.03em;
+  }
+  .btn-ghost:focus, input:focus, button:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.5rem 0.7rem; background: var(--bg); border-radius: 6px;
+    border: 1px solid var(--line); flex-wrap: wrap; gap: 0.5rem;
+  }
+  .row-left { display: flex; align-items: center; gap: 0.6rem; min-width: 0; flex: 1; flex-wrap: wrap; }
+  .row-right { display: flex; align-items: center; gap: 0.7rem; flex-shrink: 0; }
+  .idx { color: var(--gold); font-size: 0.8rem; width: 1.6rem; font-weight: 700; display: inline-block; }
+  .idx-dim { color: var(--textDim); font-size: 0.75rem; width: 1.3rem; display: inline-block; }
+  .name { font-weight: 600; white-space: nowrap; }
+  .sym { color: var(--textDim); font-size: 0.75rem; }
+  .tag { font-size: 0.62rem; border: 1px solid var(--line); border-radius: 4px; padding: 0.05rem 0.35rem; }
+  .ca-btn {
+    background: none; border: 1px solid var(--line); color: var(--textDim);
+    border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.68rem; cursor: pointer;
+  }
+  .ca-btn.copied { color: var(--teal); border-color: var(--teal); }
+  .chg { font-size: 0.75rem; }
+  .score { font-size: 0.85rem; color: var(--gold); font-weight: 700; min-width: 2.2rem; text-align: right; }
+  .section-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--teal); letter-spacing: 0.1em; margin: 1.1rem 0 0.5rem; }
+  .section-label.dim { color: var(--textDim); }
+  .err { color: var(--rust); font-size: 0.85rem; margin-top: 0.9rem; }
+  .dim-note { color: var(--textDim); font-size: 0.85rem; margin-top: 0.9rem; }
+  .footer-note { font-size: 0.7rem; color: var(--textDim); margin-top: 0.9rem; }
+  input[type=text] {
+    flex: 1; min-width: 220px; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 0.55rem 0.75rem; color: var(--text); font-size: 0.85rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .connect-btn {
+    background: var(--gold); color: var(--bg); border: none; border-radius: 6px;
+    padding: 0.55rem 1rem; font-weight: 700; font-size: 0.8rem; cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .custom-source {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 1rem; margin-top: 0.75rem;
+  }
+  .locked { opacity: 0.6; }
+  @keyframes sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #sweep-line { animation: none !important; } }
+</style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <div class="wrap" style="padding-top:3rem; padding-bottom:2rem; display:flex; gap:2rem; flex-wrap:wrap; align-items:center;">
+    <svg width="220" height="220" viewBox="0 0 220 220" style="display:block;">
+      <circle cx="110" cy="110" r="100" fill="none" stroke="#2C2E42" stroke-width="1.5" />
+      <circle cx="110" cy="110" r="70" fill="none" stroke="#2C2E42" stroke-width="1" />
+      <line x1="110" y1="10" x2="110" y2="210" stroke="#2C2E42" stroke-width="1" />
+      <line x1="10" y1="110" x2="210" y2="110" stroke="#2C2E42" stroke-width="1" />
+      <text x="110" y="24" text-anchor="middle" fill="#8B8AA0" font-size="9" font-family="'IBM Plex Mono', monospace" letter-spacing="2">FAS</text>
+      <text x="110" y="203" text-anchor="middle" fill="#8B8AA0" font-size="9" font-family="'IBM Plex Mono', monospace" letter-spacing="2">NEFAS</text>
+      <g id="sweep-line" style="transform-origin: 110px 110px; animation: sweep 6s linear infinite;">
+        <line x1="110" y1="110" x2="110" y2="16" stroke="#C9A15A" stroke-width="1.5" />
+        <circle cx="110" cy="16" r="3" fill="#C9A15A" />
+      </g>
+      <g id="pulse-dots"></g>
+      <circle cx="110" cy="110" r="3" fill="#C9A15A" />
+    </svg>
+    <div style="flex:1; min-width:260px;">
+      <div class="mono" style="font-size:0.7rem; color:var(--textDim); letter-spacing:0.2em; margin-bottom:0.5rem;">LIVE SIGNAL FEED</div>
+      <h1 class="display" style="font-size:clamp(2.2rem, 5vw, 3.2rem); color:var(--gold); margin:0; letter-spacing:0.03em;">AUSPEX</h1>
+      <p style="color:var(--textDim); margin-top:0.75rem; max-width:480px; line-height:1.5;">
+        The augurs read the sky before the flock arrived. This reads boosts, search interest, and social
+        volume before the narrative does — and gives you the contract address to act on it.
+      </p>
+    </div>
+  </div>
+
+  <!-- Hall of Fame (reference only, not statistical evidence) -->
+  <div class="wrap" style="padding-bottom:1.5rem;">
+    <div class="panel">
+      <div class="panel-title">🏆 Hall of Fame — Known Winners (Reference Only)</div>
+      <div class="mono panel-sub">
+        Backfilled occasionally from a public Dune dashboard, not live-tracked. Deliberately kept
+        separate from the 🔍 precedent stats above — we can't reconstruct these tokens' launch-time
+        RugCheck/KOL signals, only current state, so mixing them into the win-rate math would import
+        survivorship bias. Read this as "what past winners looked like," not as evidence.
+      </div>
+      <div id="hof-body" style="margin-top:0.7rem;"></div>
+    </div>
+  </div>
+
+  <!-- Manual CA Scanner -->
+  <div class="wrap" style="padding-bottom:1.5rem;">
+    <div class="panel">
+      <div class="panel-title">🔍 Scan a Contract Address</div>
+      <div class="mono panel-sub">
+        Paste any Solana or Base CA for an on-demand check — auto-detects chain, pulls DexScreener
+        price/liquidity and (Solana only) a RugCheck safety pass. KOL and LunarCrush checks aren't
+        included here — those use rate-limited keys held server-side, not available for on-demand lookups.
+      </div>
+      <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
+        <input type="text" id="scan-ca-input" placeholder="Paste a contract address…" />
+        <button class="connect-btn" id="scan-ca-btn">SCAN</button>
+      </div>
+      <div id="scan-result" style="margin-top:0.75rem;"></div>
+    </div>
+  </div>
+
+  <!-- Global indicators: market regime + active metas -->
+  <div class="wrap" style="padding-bottom:1rem;">
+    <div id="global-indicators" style="display:flex; gap:0.6rem; flex-wrap:wrap;"></div>
+  </div>
+
+  <!-- Signal Feed -->
+  <div class="wrap" style="padding-bottom:1.5rem;">
+    <div class="panel gold-border">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title lg">⚡ Signal Feed — by Chain, by CA</div>
+          <div class="mono panel-sub">
+            DexScreener + CoinGecko + GeckoTerminal (Solana &amp; Base), grouped by chain then by exact
+            contract address. A "confirmed" badge means the same CA showed up in more than one source —
+            a real match, not a ticker guess. CoinGecko coins without a resolvable on-chain address
+            (top 8 checked) fall into "No CA available" below. Solana rows may show a RugCheck safety
+            badge (🟢🟡🔴) — hover it for the risk score and specific flags. Served from a shared cache
+            updated every 90 seconds by a background worker — not fetched fresh per visitor.
+          </div>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-shrink:0;">
+          <span id="auto-refresh-status" class="mono" style="font-size:0.65rem; color:var(--textDim);"></span>
+          <button class="btn-ghost" id="auto-refresh-toggle" style="border-color:var(--teal); color:var(--teal);">AUTO: ON</button>
+          <button class="btn-ghost" id="signal-refresh" style="border-color:var(--gold);">REFRESH</button>
+        </div>
+      </div>
+      <div id="signal-body"></div>
+      <div class="footer-note" id="signal-timestamp">Waiting on first cache read…</div>
+    </div>
+  </div>
+
+  <!-- Just Launched / Just Graduated (PumpPortal live feed) -->
+  <div class="wrap" style="padding-bottom:1.5rem; display:grid; gap:1.25rem;">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">🆕 Just Launched — pump.fun + LetsBonk.fun</div>
+          <div class="mono panel-sub">
+            Live via PumpPortal WebSocket — covers both major Solana launchpads on one connection.
+            The moment a token is created, before it has any volume, boosts, or trending status anywhere
+            else. No RugCheck applied here — most of these die in minutes. Each may get a 🔴/🟡/🟢 creator
+            wallet-age badge (Helius) and a 🔴/🟡/🟢 X-account-age badge (X API, when a linked handle is
+            found) — both experience/age only, not a rug-history check. A gold-bordered row with
+            🏆 SERIAL WINNER means this exact wallet previously created a Hall of Fame token — a real,
+            verifiable fact when it fires, not a validated predictor of anything. A ⚪/🟢/🟡/🔴 BUNDLE RISK
+            badge appears ~20s after launch (PumpPortal trade-level stream, metered) based on how
+            concentrated the earliest buys were. Rolling window of the last 30.
+          </div>
+        </div>
+      </div>
+      <div id="launched-body"></div>
+      <div class="footer-note" id="launched-timestamp">From shared cache, worker-updated live.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">🎓 Just Graduated — Bonding Curve → Raydium</div>
+          <div class="mono panel-sub">
+            Migrated off a bonding curve (pump.fun or LetsBonk.fun) to a real Raydium pool — meaningfully
+            rarer and higher-signal than a raw launch. Each gets a RugCheck safety pass automatically.
+            Rolling window of the last 15.
+          </div>
+        </div>
+      </div>
+      <div id="graduated-body"></div>
+      <div class="footer-note" id="graduated-timestamp">From shared cache, worker-updated live.</div>
+    </div>
+  </div>
+
+  <!-- Paper Trading Results -->
+  <div class="wrap" style="padding-bottom:1.5rem;">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">🧪 Paper Trading — Simulated, Zero Real Money</div>
+          <div class="mono panel-sub">
+            Every qualifying launch gets a simulated buy logged automatically. Tracks whether it graduates
+            (survives to a real Raydium pool) and, if so, real DexScreener price at 5min/30min/2hr/24hr
+            after graduation. Once 5+ comparable past trades exist (same wallet-age bucket, similar entry
+            size), new trades also show a 🔍 precedent badge — a real historical win-rate lookup, not a
+            guess. No badge yet means not enough data, not "no signal."
+          </div>
+        </div>
+        <button class="btn-ghost" id="paper-refresh">REFRESH</button>
+      </div>
+      <div id="paper-stats" style="margin-top:0.9rem;"></div>
+      <div id="paper-body" style="margin-top:0.6rem;"></div>
+      <div class="footer-note" id="paper-timestamp">Reads directly from the paper_trades table.</div>
+    </div>
+  </div>
+
+  <!-- Connect a feed -->
+  <div class="wrap" style="padding-bottom:1.5rem;">
+    <div class="panel">
+      <div class="panel-title">+ Connect a feed</div>
+      <div class="mono panel-sub">Point this at any JSON API — your own Auspex endpoint once it's deployed, or anything else. Must allow browser CORS.</div>
+      <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
+        <input type="text" id="feed-url-input" placeholder="https://your-api.example.com/signals" />
+        <button class="connect-btn" id="feed-connect-btn">CONNECT</button>
+      </div>
+      <div id="custom-sources"></div>
+    </div>
+  </div>
+
+  <!-- Raw feeds -->
+  <div class="wrap">
+    <div class="mono" style="font-size:0.7rem; color:var(--textDim); letter-spacing:0.15em; margin-bottom:0.75rem;">RAW FEEDS — SOURCES BEHIND THE SCORE ABOVE</div>
+  </div>
+  <div class="wrap" style="display:grid; gap:1.25rem;">
+
+    <div class="panel" id="dex-panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">DexScreener — Top Boosted</div>
+          <div class="mono panel-sub">Tokens with the most active paid boosts right now. Earliest visible signal, often before social tools catch it — not the same as pure organic trending. Shared cache, updated every 90s.</div>
+        </div>
+        <button class="btn-ghost" id="dex-refresh">REFRESH</button>
+      </div>
+      <div id="dex-body"></div>
+      <div class="footer-note" id="dex-timestamp">Waiting on first cache read…</div>
+    </div>
+
+    <div class="panel" id="cg-panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">CoinGecko — Trending Search</div>
+          <div class="mono panel-sub">Top coins by search activity on CoinGecko, last 24h. Search interest, not fresh contract addresses — skews toward already-known names. Shared cache, updated every 90s.</div>
+        </div>
+        <button class="btn-ghost" id="cg-refresh">REFRESH</button>
+      </div>
+      <div id="cg-body"></div>
+      <div class="footer-note" id="cg-timestamp">Waiting on first cache read…</div>
+    </div>
+
+    <div class="panel locked">
+      <div class="panel-head" style="align-items:center;">
+        <div class="panel-title" style="color:var(--text);">🔒 LunarCrush — Social Signal</div>
+        <span class="mono tag" style="color:var(--textDim);">NOT SUBSCRIBED</span>
+      </div>
+      <p style="color:var(--textDim); font-size:0.85rem; margin-top:0.5rem;">
+        Connector is live. Galaxy Score, AltRank, and X mention volume populate here once the LunarCrush
+        account is upgraded to a paid tier.
+      </p>
+    </div>
+
+  </div>
+
+  <div class="wrap footer-note" style="margin-top:2rem;">
+    All three panels above read from one shared Supabase cache, refreshed every 90 seconds by a background
+    worker — not fetched directly by your browser. That means any number of people can have this open at
+    once without multiplying API calls or hitting rate limits. This page re-reads that cache every 90s;
+    toggle AUTO: OFF to stop and read manually instead. Solana rows may show a 🎯 KOL BUY badge — that
+    means a tracked KOL bought it recently on MadeOnSol's free-tier feed, not that they're confirmed to
+    still be holding it. Top signals may also show a 📡 badge (Galaxy Score + sentiment, hover for social
+    dominance, 24h interactions, and top creators), a separate 📈/📉 AltRank badge (rank velocity, not a
+    static score), and — only when genuinely spiking — an organic/mixed/manufactured hype verdict badge
+    (✅/⚠️/🤖, spam-lift and creator-concentration math ported from a real open-source classifier by
+    Nicki Sanders) once LunarCrush is upgraded to a paid plan — no free API tier exists for it. No badge
+    at all means "not spiking," not "checked and clean." Solana rows also carry a RugCheck safety badge
+    (🟢 safe / 🟡 caution / 🔴 danger,
+    free, no key) — deliberately kept separate from the score above, since a token can score high on
+    momentum and still be a rug; don't let a good score wave off a red badge.
+  </div>
+  </div>
+
+  <!-- PNL Card modal -->
+  <div id="card-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center; padding:1.5rem;">
+    <div style="max-width:420px; width:100%;">
+      <canvas id="card-canvas" width="1000" height="1250" style="width:100%; height:auto; border-radius:12px; display:block;"></canvas>
+      <div style="display:flex; gap:0.6rem; margin-top:1rem;">
+        <button class="connect-btn" id="card-download-btn" style="flex:1;">DOWNLOAD PNG</button>
+        <button class="btn-ghost" id="card-close-btn" style="padding:0.55rem 1.2rem;">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- fill these in with your actual Supabase project values ----------
+  // Project URL and anon key are both from Supabase: Settings > API.
+  // The anon key is SAFE to put here — it's designed for public browser use and
+  // only allows what the RLS policy grants (read-only, per auspex-schema.sql).
+  // NEVER put the service_role key in this file — that one lives only in the
+  // Railway worker's environment variables.
+  var SUPABASE_URL = "https://qwykkcsyoghljgndnvaz.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3eWtrY3N5b2dobGpnbmRudmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1NjE0MjQsImV4cCI6MjEwMjEzNzQyNH0.6Z_xRj-TaDyiWtf_1xHa3pywfQUt1M_l6QMXiKD5mco";
+
+  // ---------- helpers ----------
+  function esc(s) {
+    if (s == null) return "";
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function copyToClipboard(text, btnEl) {
+    navigator.clipboard.writeText(text).then(function () {
+      var orig = btnEl.textContent;
+      btnEl.textContent = "copied ✓";
+      btnEl.classList.add("copied");
+      setTimeout(function () {
+        btnEl.textContent = orig;
+        btnEl.classList.remove("copied");
+      }, 1500);
+    });
+  }
+
+  function attachCopyHandlers(container) {
+    container.querySelectorAll(".ca-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        copyToClipboard(btn.getAttribute("data-ca"), btn);
+      });
+    });
+  }
+
+  // ---------- pulse dots on hero ----------
+  (function drawPulses() {
+    var svgNS = "http://www.w3.org/2000/svg";
+    var g = document.getElementById("pulse-dots");
+    var count = 5;
+    for (var i = 0; i < count; i++) {
+      var angle = (i / count) * 2 * Math.PI + 0.6;
+      var r = 55 + (i % 3) * 15;
+      var x = 110 + r * Math.cos(angle);
+      var y = 110 + r * Math.sin(angle);
+      var c = document.createElementNS(svgNS, "circle");
+      c.setAttribute("cx", x.toFixed(1));
+      c.setAttribute("cy", y.toFixed(1));
+      c.setAttribute("r", "2.5");
+      c.setAttribute("fill", "#5FA88F");
+      c.setAttribute("opacity", "0.85");
+      g.appendChild(c);
+    }
+  })();
+
+  // ---------- row rendering (shared by Signal Feed + raw panels) ----------
+  function renderSignalRowHTML(r, idx, keyPrefix, kolBuys, lunarSignals, rugSafety) {
+    var key = keyPrefix + "-" + (r.tokenAddress || r.symbol || "row") + "-" + idx;
+    var sourceColor = { DEX: "var(--rust)", CG: "var(--gold)", GT: "var(--teal)" };
+    var sourcesBadges = (r.sources || []).map(function (s) {
+      return '<span class="mono tag" style="color:' + (sourceColor[s] || "var(--textDim)") + '">' + s + "</span>";
+    }).join("");
+    var confirmBadge = r.sources && r.sources.length > 1
+      ? '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">×' + r.sources.length + " confirmed — same CA</span>"
+      : "";
+    var caBtn = r.tokenAddress
+      ? '<button class="ca-btn mono" data-ca="' + esc(r.tokenAddress) + '" data-key="' + key + '">' +
+        esc(r.tokenAddress.slice(0, 5) + "…" + r.tokenAddress.slice(-4)) + "</button>"
+      : "";
+    var changeHTML = r.change24h != null
+      ? '<span class="chg mono" style="color:' + (r.change24h >= 0 ? "var(--teal)" : "var(--rust)") + '">' +
+        (r.change24h >= 0 ? "+" : "") + Number(r.change24h).toFixed(1) + "%</span>"
+      : "";
+
+    var caveats = [];
+
+    var rugBadge = "";
+    var rug = rugSafety && r.tokenAddress ? rugSafety[r.tokenAddress.toLowerCase()] : null;
+    if (rug && rug.tier !== "unknown") {
+      var tierMap = {
+        safe: { emoji: "🟢", label: "SAFE", color: "var(--teal)" },
+        caution: { emoji: "🟡", label: "CAUTION", color: "var(--gold)" },
+        danger: { emoji: "🔴", label: "DANGER", color: "var(--rust)" },
+      };
+      var t = tierMap[rug.tier];
+      var ageText = "";
+      if (rug.checkedAt) {
+        var ageMin = Math.round((Date.now() - new Date(rug.checkedAt).getTime()) / 60000);
+        ageText = " · " + (ageMin <= 0 ? "just now" : ageMin + "m ago");
+      }
+      rugBadge = '<span class="mono tag" style="color:' + t.color + "; border-color:" + t.color + ';">' + t.emoji + " " + t.label + esc(ageText) + "</span>";
+      var rugCaveat = "🛡 RugCheck " + rug.riskScore + "/100" + (rug.risks.length ? " — " + rug.risks.join(", ") : "") +
+        ". Checks contract mechanics only (mint/freeze authority, LP lock, holder concentration) — cannot detect a coordinated group simply selling on the open market.";
+      caveats.push(rugCaveat);
+    }
+
+    var kolBadge = "";
+    var kolHits = kolBuys && r.tokenAddress ? kolBuys[r.tokenAddress.toLowerCase()] : null;
+    if (kolHits && kolHits.length > 0) {
+      var names = kolHits.slice(0, 2).map(function (h) { return esc(h.kol); }).join(", ");
+      var extra = kolHits.length > 2 ? " +" + (kolHits.length - 2) : "";
+      kolBadge = '<span class="mono tag" style="color:var(--gold); border-color:var(--gold);">🎯 KOL BUY: ' + names + extra + "</span>";
+      caveats.push("🎯 " + names + extra + " — recent buy seen in feed, not a confirmed current holding. They may have already sold.");
+    }
+
+    var lunarBadge = "";
+    var altRankBadge = "";
+    var hypeBadge = "";
+    var lunar = lunarSignals && r.symbol ? lunarSignals[r.symbol.toUpperCase()] : null;
+    if (lunar) {
+      var creatorParts = (lunar.topCreators || []).map(function (c) {
+        return c.handle + " (" + c.interactions + " int.)";
+      }).join(" · ");
+      var scoreText = lunar.galaxyScore != null ? "GS " + lunar.galaxyScore : "";
+      var sentText = lunar.sentiment != null ? " · " + Math.round(lunar.sentiment) + "% pos" : "";
+      lunarBadge = '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">📡 ' + esc(scoreText + sentText) + "</span>";
+      var lunarCaveatParts = [];
+      if (lunar.socialDominance != null) lunarCaveatParts.push("social dominance " + Number(lunar.socialDominance).toFixed(2) + "%");
+      if (lunar.interactions24h != null) lunarCaveatParts.push(lunar.interactions24h + " interactions (24h)");
+      if (creatorParts) lunarCaveatParts.push("top creators: " + creatorParts);
+      if (lunarCaveatParts.length) caveats.push("📡 " + lunarCaveatParts.join(" · "));
+
+      // rank velocity, separate badge — climbing/falling matters more than a static score for early signal
+      if (lunar.altRankDelta != null) {
+        var climbing = lunar.altRankDelta > 0;
+        var arColor = climbing ? "var(--teal)" : "var(--rust)";
+        var arText = (climbing ? "+" : "") + lunar.altRankDelta + " AltRank";
+        altRankBadge = '<span class="mono tag" style="color:' + arColor + "; border-color:" + arColor + ';">' + (climbing ? "\uD83D\uDCC8" : "\uD83D\uDCC9") + " " + esc(arText) + "</span>";
+        caveats.push((climbing ? "\uD83D\uDCC8" : "\uD83D\uDCC9") + " AltRank #" + lunar.altRankPrevious + " \u2192 #" + lunar.altRank + " in the last day");
+      }
+
+      // hype verdict — only present at all when the coin is genuinely spiking (z >= 2.0);
+      // silence here means "not spiking," not "checked and clean"
+      if (lunar.hype && lunar.hype.spiking) {
+        var h = lunar.hype;
+        var verdictStyle = {
+          organic: { emoji: "\u2705", color: "var(--teal)" },
+          mixed: { emoji: "\u26A0\uFE0F", color: "var(--gold)" },
+          manufactured: { emoji: "\uD83E\uDD16", color: "var(--rust)" },
+        }[h.verdict] || { emoji: "?", color: "var(--textDim)" };
+        var flags = [];
+        if (h.megaphone) flags.push("megaphone — one account is most of the conversation");
+        if (h.institutionalBroadcast) flags.push("institutional broadcast, not organic crowd");
+        hypeBadge = '<span class="mono tag" style="color:' + verdictStyle.color + "; border-color:" + verdictStyle.color + ';">' + verdictStyle.emoji + " " + h.verdict.toUpperCase() + "</span>";
+        var hypeCaveat = verdictStyle.emoji + " Spike z-score " + h.zScore + ", spam ratio " + Math.round(h.spamRatio * 100) +
+          "%, top-3 creators = " + Math.round(h.top3CreatorShare * 100) + "% of interactions" + (flags.length ? " — " + flags.join(", ") : "");
+        caveats.push(hypeCaveat);
+      }
+    }
+
+    var caveatBlock = caveats.length > 0
+      ? '<div class="mono" style="font-size:0.62rem; color:var(--textDim); line-height:1.5; margin-top:0.35rem; padding-left:1.9rem;">' +
+        caveats.map(function (c) { return "\u21B3 " + esc(c); }).join("<br>") +
+        "</div>"
+      : "";
+
+    return (
+      '<div class="row" style="flex-direction:column; align-items:stretch;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">' +
+          '<div class="row-left">' +
+            '<span class="idx mono">' + (idx + 1) + "</span>" +
+            rugBadge +
+            '<span class="name">' + esc(r.name || r.symbol || "unknown") + "</span>" +
+            (r.symbol ? '<span class="sym mono">' + esc(r.symbol) + "</span>" : "") +
+            sourcesBadges + confirmBadge + caBtn + kolBadge + lunarBadge + altRankBadge + hypeBadge +
+          "</div>" +
+          '<div class="row-right">' +
+            changeHTML +
+            '<span class="score mono">' + r.score + "</span>" +
+          "</div>" +
+        "</div>" +
+        caveatBlock +
+      "</div>"
+    );
+  }
+
+  function renderDexRowHTML(t, idx) {
+    var iconHTML = t.icon ? '<img src="' + esc(t.icon) + '" alt="" width="18" height="18" style="border-radius:50%;" />' : "";
+    var caBtn = t.tokenAddress
+      ? '<button class="ca-btn mono" data-ca="' + esc(t.tokenAddress) + '" data-key="dexraw-' + idx + '">' +
+        esc(t.tokenAddress.slice(0, 5) + "…" + t.tokenAddress.slice(-4)) + "</button>"
+      : "";
+    var priceHTML = t.priceUsd ? '<span class="mono" style="font-size:0.75rem; color:var(--textDim);">$' +
+      (Number(t.priceUsd) < 0.01 ? Number(t.priceUsd).toExponential(2) : Number(t.priceUsd).toFixed(4)) + "</span>" : "";
+    var changeHTML = t.change24h != null ? '<span class="chg mono" style="color:' + (t.change24h >= 0 ? "var(--teal)" : "var(--rust)") + '">' +
+      (t.change24h >= 0 ? "+" : "") + Number(t.change24h).toFixed(1) + "%</span>" : "";
+    return '<a href="' + esc(t.url || "#") + '" target="_blank" rel="noopener noreferrer" class="row" style="text-decoration:none; color:inherit;">' +
+      '<div class="row-left">' +
+        '<span class="idx-dim mono">' + (idx + 1) + "</span>" + iconHTML +
+        '<span class="name">' + esc(t.name || "unknown") + "</span>" +
+        (t.symbol ? '<span class="sym mono">' + esc(t.symbol) + "</span>" : "") +
+        (t.chainId ? '<span class="mono tag" style="color:var(--teal);">' + esc(t.chainId) + "</span>" : "") +
+        caBtn +
+      "</div>" +
+      '<div class="row-right">' + priceHTML + changeHTML + "</div>" +
+    "</a>";
+  }
+
+  function renderCgRowHTML(c, idx) {
+    var thumbHTML = c.icon ? '<img src="' + esc(c.icon) + '" alt="" width="18" height="18" style="border-radius:50%;" />' : "";
+    var rankHTML = c.rank ? '<span class="mono" style="font-size:0.7rem; color:var(--textDim);">rank #' + c.rank + "</span>" : "";
+    var changeHTML = c.change24h != null ? '<span class="chg mono" style="color:' + (c.change24h >= 0 ? "var(--teal)" : "var(--rust)") + '">' +
+      (c.change24h >= 0 ? "+" : "") + Number(c.change24h).toFixed(1) + "%</span>" : "";
+    return '<div class="row">' +
+      '<div class="row-left">' +
+        '<span class="idx-dim mono">' + (idx + 1) + "</span>" + thumbHTML +
+        '<span class="name">' + esc(c.name) + "</span>" +
+        '<span class="sym mono">' + esc((c.symbol || "").toUpperCase()) + "</span>" +
+      "</div>" +
+      '<div class="row-right">' + rankHTML + changeHTML + "</div>" +
+    "</div>";
+  }
+
+  // ---------- single cache read, feeds all three panels ----------
+  async function loadFromCache() {
+    var signalBtn = document.getElementById("signal-refresh");
+    var dexBtn = document.getElementById("dex-refresh");
+    var cgBtn = document.getElementById("cg-refresh");
+    [signalBtn, dexBtn, cgBtn].forEach(function (b) { b.textContent = "REFRESHING…"; });
+
+    try {
+      var res = await fetch(
+        SUPABASE_URL + "/rest/v1/auspex_signal_cache?id=eq.latest&select=payload,updated_at",
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY } }
+      );
+      if (!res.ok) throw new Error("Status " + res.status);
+      var rows = await res.json();
+      if (!rows.length) throw new Error("No cache row found — has the worker run yet?");
+      var payload = rows[0].payload;
+      var updatedAt = rows[0].updated_at;
+
+      renderGlobalIndicators(payload);
+      renderSignalFeed(payload);
+      renderDexPanel(payload.rawDex || []);
+      renderCgPanel(payload.rawCg || []);
+      renderLaunchedPanel(payload.justLaunched || []);
+      renderGraduatedPanel(payload.justGraduated || []);
+
+      var ts = new Date(updatedAt).toLocaleTimeString();
+      document.getElementById("signal-timestamp").textContent = "Cache last updated by worker at " + ts + " — this page re-reads it every 90s.";
+      document.getElementById("dex-timestamp").textContent = "From shared cache, worker-updated at " + ts + ".";
+      document.getElementById("cg-timestamp").textContent = "From shared cache, worker-updated at " + ts + ".";
+      document.getElementById("launched-timestamp").textContent = "From shared cache, worker-updated at " + ts + ".";
+      document.getElementById("graduated-timestamp").textContent = "From shared cache, worker-updated at " + ts + ".";
+
+      [signalBtn, dexBtn, cgBtn].forEach(function (b) { b.textContent = "REFRESH"; });
+      return true;
+    } catch (e) {
+      [signalBtn, dexBtn, cgBtn].forEach(function (b) { b.textContent = "REFRESH"; });
+      var msg = '<div class="err">Couldn\'t reach the Supabase cache — check SUPABASE_URL / SUPABASE_ANON_KEY are filled in correctly, and that the worker has run at least once. (' + esc(e.message) + ")</div>";
+      document.getElementById("signal-body").innerHTML = msg;
+      document.getElementById("dex-body").innerHTML = msg;
+      document.getElementById("launched-body").innerHTML = msg;
+      document.getElementById("graduated-body").innerHTML = msg;
+      document.getElementById("cg-body").innerHTML = msg;
+      return false;
+    }
+  }
+
+  function renderGlobalIndicators(payload) {
+    var el = document.getElementById("global-indicators");
+    var html = "";
+
+    var regime = payload.marketRegime;
+    if (regime) {
+      var regimeStyle = {
+        "risk-on": { emoji: "\uD83D\uDFE2", color: "var(--teal)", label: "RISK-ON" },
+        "risk-off": { emoji: "\uD83D\uDD34", color: "var(--rust)", label: "RISK-OFF" },
+        neutral: { emoji: "\u26AA", color: "var(--textDim)", label: "NEUTRAL" },
+      }[regime.regime] || { emoji: "?", color: "var(--textDim)", label: "UNKNOWN" };
+      html += '<span class="mono tag" style="color:' + regimeStyle.color + "; border-color:" + regimeStyle.color +
+        '; padding:0.3rem 0.6rem; font-size:0.75rem;" title="SOL 24h change, an unvalidated \u00b15% heuristic, not a precise signal">' +
+        regimeStyle.emoji + " SOL " + (regime.solChange24h >= 0 ? "+" : "") + regime.solChange24h + "% \u2014 " + regimeStyle.label + "</span>";
+    }
+
+    var metas = payload.activeMetas || [];
+    metas.forEach(function (m) {
+      html += '<span class="mono tag" style="color:var(--gold); border-color:var(--gold); padding:0.3rem 0.6rem; font-size:0.75rem;" title="' +
+        esc("Recent launches: " + m.examples.join(", ")) + '">\uD83D\uDD25 META: "' + esc(m.keyword) + '" \u00d7' + m.count + "</span>";
+    });
+
+    if (!regime && metas.length === 0) {
+      html = '<span class="mono" style="font-size:0.75rem; color:var(--textDim);">No global signals yet.</span>';
+    }
+    el.innerHTML = html;
+  }
+
+  function renderSignalFeed(payload) {
+    var body = document.getElementById("signal-body");
+    var chainGroups = payload.chainGroups || {};
+    var unmapped = payload.unmapped || [];
+    var failedSources = payload.failedSources || [];
+    var kolBuys = payload.kolBuys || {};
+    var lunarSignals = payload.lunarSignals || {};
+    var rugSafety = payload.rugSafety || {};
+
+    var chainOrder = Object.keys(chainGroups).sort(function (a, b) {
+      var bestA = chainGroups[a][0] ? chainGroups[a][0].score : 0;
+      var bestB = chainGroups[b][0] ? chainGroups[b][0].score : 0;
+      return bestB - bestA;
+    });
+
+    var html = "";
+    if (failedSources.length > 0) {
+      html += '<div class="err">Worker\'s last cycle couldn\'t reach: ' + esc(failedSources.join(", ")) + "</div>";
+    }
+    chainOrder.forEach(function (chain) {
+      var rows = chainGroups[chain];
+      html += '<div class="section-label">' + esc(chain.toUpperCase()) + " · " + rows.length + " signal" + (rows.length === 1 ? "" : "s") + "</div>";
+      html += '<div style="display:grid; gap:0.4rem;">';
+      rows.forEach(function (r, idx) { html += renderSignalRowHTML(r, idx, chain, kolBuys, lunarSignals, rugSafety); });
+      html += "</div>";
+    });
+    if (unmapped.length > 0) {
+      html += '<div class="section-label dim">NO CA AVAILABLE · ' + unmapped.length + "</div>";
+      html += '<div style="display:grid; gap:0.4rem;">';
+      unmapped.forEach(function (r, idx) { html += renderSignalRowHTML(r, idx, "unmapped", kolBuys, lunarSignals, rugSafety); });
+      html += "</div>";
+    }
+    if (chainOrder.length === 0 && unmapped.length === 0) {
+      html = '<div class="dim-note">No signals in the cache yet — the worker may not have completed its first cycle.</div>';
+    }
+    body.innerHTML = html;
+    attachCopyHandlers(body);
+  }
+
+  function renderDexPanel(records) {
+    var body = document.getElementById("dex-body");
+    if (records.length === 0) {
+      body.innerHTML = '<div class="dim-note">No boosted tokens in the cache right now.</div>';
+      return;
+    }
+    var html = '<div style="display:grid; gap:0.4rem;">';
+    records.forEach(function (t, idx) { html += renderDexRowHTML(t, idx); });
+    html += "</div>";
+    body.innerHTML = html;
+    attachCopyHandlers(body);
+  }
+
+  function renderCgPanel(records) {
+    var body = document.getElementById("cg-body");
+    if (records.length === 0) {
+      body.innerHTML = '<div class="dim-note">No trending coins in the cache right now.</div>';
+      return;
+    }
+    var html = '<div style="display:grid; gap:0.4rem;">';
+    records.forEach(function (c, idx) { html += renderCgRowHTML(c, idx); });
+    html += "</div>";
+    body.innerHTML = html;
+  }
+
+  function renderLaunchedPanel(launches) {
+    var body = document.getElementById("launched-body");
+    if (!launches || launches.length === 0) {
+      body.innerHTML = '<div class="dim-note">Waiting for the next launch — these come in continuously once live.</div>';
+      return;
+    }
+    var ageStyle = {
+      "brand-new": { emoji: "\uD83D\uDD34", color: "var(--rust)", label: "BRAND-NEW WALLET" },
+      young: { emoji: "\uD83D\uDFE1", color: "var(--gold)", label: "YOUNG WALLET" },
+      established: { emoji: "\uD83D\uDFE2", color: "var(--teal)", label: "ESTABLISHED WALLET" },
+    };
+    var html = '<div style="display:grid; gap:0.35rem;">';
+    launches.forEach(function (l, idx) {
+      var caBtn = '<button class="ca-btn mono" data-ca="' + esc(l.mint) + '" data-key="launch-' + idx + '">' +
+        esc(l.mint.slice(0, 5) + "…" + l.mint.slice(-4)) + "</button>";
+      var mcapHTML = l.marketCapSol != null ? '<span class="mono" style="font-size:0.7rem; color:var(--textDim);">' + Number(l.marketCapSol).toFixed(1) + " SOL mcap</span>" : "";
+      var walletBadge = "";
+      if (l.creatorWallet && l.creatorWallet.ageLabel) {
+        var w = ageStyle[l.creatorWallet.ageLabel];
+        if (w) {
+          var wTitle = l.creatorWallet.txCount + (l.creatorWallet.cappedAt100 ? "+" : "") + " prior transactions from this wallet — age/experience only, not a rug-history check";
+          walletBadge = '<span class="mono tag" style="color:' + w.color + "; border-color:" + w.color + ';" title="' + esc(wTitle) + '">' + w.emoji + " " + w.label + "</span>";
+        }
+      } else if (l.creator) {
+        walletBadge = '<span class="mono tag" style="color:var(--textDim);">checking wallet\u2026</span>';
+      }
+      var winnerBadge = "";
+      var rowStyleOverride = "";
+      if (l.serialWinner && l.serialWinner.length > 0) {
+        var priorList = l.serialWinner.map(function (w) {
+          return (w.symbol || w.name || "unknown") + (w.peakMcapUsd ? " (peak $" + Number(w.peakMcapUsd).toLocaleString() + ")" : "");
+        }).join(", ");
+        winnerBadge = '<span class="mono tag" style="color:var(--gold); border-color:var(--gold); font-weight:700;" title="' +
+          esc("Same wallet previously created: " + priorList) + '">\uD83C\uDFC6 SERIAL WINNER</span>';
+        rowStyleOverride = ' border-color:var(--gold); border-width:2px;';
+      }
+      var xBadge = "";
+      if (l.xAccountAge && l.xAccountAge.ageLabel) {
+        var xMap = {
+          "brand-new": { emoji: "\uD83D\uDD34", color: "var(--rust)", label: "NEW X ACCT" },
+          young: { emoji: "\uD83D\uDFE1", color: "var(--gold)", label: "YOUNG X ACCT" },
+          established: { emoji: "\uD83D\uDFE2", color: "var(--teal)", label: "OLD X ACCT" },
+        };
+        var xs = xMap[l.xAccountAge.ageLabel];
+        if (xs) {
+          xBadge = '<span class="mono tag" style="color:' + xs.color + "; border-color:" + xs.color + ';" title="@' +
+            esc(l.xAccountAge.handle) + " — " + l.xAccountAge.ageDays + ' days old">' + xs.emoji + " " + xs.label + "</span>";
+        }
+      } else if (l.xHandle) {
+        xBadge = '<span class="mono tag" style="color:var(--textDim);">checking @' + esc(l.xHandle) + '\u2026</span>';
+      }
+      var bundleBadge = "";
+      if (l.bundleCheck) {
+        var bMap = {
+          high: { emoji: "\uD83D\uDD34", color: "var(--rust)", label: "BUNDLE RISK: HIGH" },
+          medium: { emoji: "\uD83D\uDFE1", color: "var(--gold)", label: "BUNDLE RISK: MED" },
+          low: { emoji: "\uD83D\uDFE2", color: "var(--teal)", label: "BUNDLE RISK: LOW" },
+          unknown: { emoji: "\u26AA", color: "var(--textDim)", label: "NO EARLY BUYS SEEN" },
+        };
+        var bs = bMap[l.bundleCheck.riskLabel] || bMap.unknown;
+        bundleBadge = '<span class="mono tag" style="color:' + bs.color + "; border-color:" + bs.color + ';" title="' +
+          l.bundleCheck.totalBuys + " buys, " + l.bundleCheck.uniqueBuyers + " unique buyers in first " +
+          l.bundleCheck.windowSec + 's">' + bs.emoji + " " + bs.label + "</span>";
+      }
+      var metaBadge = "";
+      if (l.matchedMetas && l.matchedMetas.length > 0) {
+        metaBadge = '<span class="mono tag" style="color:var(--gold); border-color:var(--gold);" title="Part of a forming theme/meta">\uD83D\uDD25 ' +
+          esc(l.matchedMetas.join(", ")) + "</span>";
+      }
+      html += '<div class="row" style="padding:0.4rem 0.6rem;' + rowStyleOverride + '">' +
+        '<div class="row-left">' +
+          '<span class="name" style="font-size:0.85rem;">' + esc(l.name || "unnamed") + "</span>" +
+          (l.symbol ? '<span class="sym mono">' + esc(l.symbol) + "</span>" : "") +
+          caBtn + walletBadge + winnerBadge + xBadge + bundleBadge + metaBadge +
+        "</div>" +
+        '<div class="row-right">' + mcapHTML + "</div>" +
+      "</div>";
+    });
+    html += "</div>";
+    body.innerHTML = html;
+    attachCopyHandlers(body);
+  }
+
+  function renderGraduatedPanel(grads) {
+    var body = document.getElementById("graduated-body");
+    if (!grads || grads.length === 0) {
+      body.innerHTML = '<div class="dim-note">No graduations in the cache yet — these are rarer than raw launches.</div>';
+      return;
+    }
+    var tierMap = {
+      safe: { emoji: "🟢", label: "SAFE", color: "var(--teal)" },
+      caution: { emoji: "🟡", label: "CAUTION", color: "var(--gold)" },
+      danger: { emoji: "🔴", label: "DANGER", color: "var(--rust)" },
+    };
+    var html = '<div style="display:grid; gap:0.4rem;">';
+    grads.forEach(function (g, idx) {
+      var caBtn = '<button class="ca-btn mono" data-ca="' + esc(g.mint) + '" data-key="grad-' + idx + '">' +
+        esc(g.mint.slice(0, 5) + "…" + g.mint.slice(-4)) + "</button>";
+      var rugBadge = "";
+      if (g.rugSafety && g.rugSafety.tier) {
+        var t = tierMap[g.rugSafety.tier];
+        if (t) {
+          var riskTitle = "RugCheck score " + g.rugSafety.riskScore + "/100" + (g.rugSafety.risks && g.rugSafety.risks.length ? " — " + g.rugSafety.risks.join(", ") : "");
+          rugBadge = '<span class="mono tag" style="color:' + t.color + "; border-color:" + t.color + ';" title="' + esc(riskTitle) + '">' + t.emoji + " " + t.label + "</span>";
+        }
+      } else {
+        rugBadge = '<span class="mono tag" style="color:var(--textDim);">checking…</span>';
+      }
+      html += '<div class="row">' +
+        '<div class="row-left">' +
+          rugBadge +
+          '<span class="name">' + esc(g.name || "unnamed") + "</span>" +
+          (g.symbol ? '<span class="sym mono">' + esc(g.symbol) + "</span>" : "") +
+          caBtn +
+        "</div>" +
+      "</div>";
+    });
+    html += "</div>";
+    body.innerHTML = html;
+    attachCopyHandlers(body);
+  }
+
+  // ---------- auto-refresh: re-reads the cache every 90s, matching the worker's cadence ----------
+  var INTERVAL_SEC = 90;
+  var autoRefreshEnabled = true;
+  var secondsLeft = INTERVAL_SEC;
+
+  function statusText() {
+    var el = document.getElementById("auto-refresh-status");
+    if (!autoRefreshEnabled) { el.textContent = "paused"; return; }
+    if (document.hidden) { el.textContent = "paused (tab hidden)"; return; }
+    el.textContent = "next in " + secondsLeft + "s";
+  }
+
+  function tick() {
+    if (!autoRefreshEnabled || document.hidden) { statusText(); return; }
+    secondsLeft -= 1;
+    if (secondsLeft <= 0) {
+      loadFromCache().then(function () { secondsLeft = INTERVAL_SEC; statusText(); });
+    } else {
+      statusText();
+    }
+  }
+
+  function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    var btn = document.getElementById("auto-refresh-toggle");
+    if (autoRefreshEnabled) {
+      btn.textContent = "AUTO: ON";
+      btn.style.borderColor = "var(--teal)";
+      btn.style.color = "var(--teal)";
+      secondsLeft = INTERVAL_SEC;
+    } else {
+      btn.textContent = "AUTO: OFF";
+      btn.style.borderColor = "var(--textDim)";
+      btn.style.color = "var(--textDim)";
+    }
+    statusText();
+  }
+
+  document.getElementById("auto-refresh-toggle").addEventListener("click", toggleAutoRefresh);
+  document.getElementById("signal-refresh").addEventListener("click", function () { loadFromCache().then(function () { secondsLeft = INTERVAL_SEC; }); });
+  document.getElementById("dex-refresh").addEventListener("click", function () { loadFromCache().then(function () { secondsLeft = INTERVAL_SEC; }); });
+  document.getElementById("cg-refresh").addEventListener("click", function () { loadFromCache().then(function () { secondsLeft = INTERVAL_SEC; }); });
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && autoRefreshEnabled && secondsLeft <= 0) {
+      loadFromCache().then(function () { secondsLeft = INTERVAL_SEC; statusText(); });
+    } else {
+      statusText();
+    }
+  });
+
+  setInterval(tick, 1000);
+
+  // ---------- custom feed connector (unchanged — still per-browser, not persisted) ----------
+  var customSourceCounter = 0;
+  function addCustomSource(url) {
+    customSourceCounter += 1;
+    var id = "custom-" + customSourceCounter;
+    var container = document.getElementById("custom-sources");
+    var div = document.createElement("div");
+    div.className = "custom-source";
+    div.id = id;
+    div.innerHTML =
+      '<div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">' +
+        '<div class="mono" style="font-size:0.75rem; color:var(--textDim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(url) + "</div>" +
+        '<div style="display:flex; gap:0.4rem; flex-shrink:0;">' +
+          '<button class="btn-ghost" data-action="refresh">REFRESH</button>' +
+          '<button class="btn-ghost" data-action="remove" style="color:var(--rust); border-color:var(--rust);">REMOVE</button>' +
+        "</div>" +
+      "</div>" +
+      '<div class="custom-body" style="margin-top:0.6rem;"></div>';
+    container.appendChild(div);
+
+    var bodyEl = div.querySelector(".custom-body");
+
+    function load() {
+      bodyEl.innerHTML = '<div class="dim-note" style="margin-top:0;">Loading…</div>';
+      fetch(url)
+        .then(function (res) {
+          if (!res.ok) throw new Error("Status " + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          var arr = Array.isArray(data) ? data : (data.data || data.results || data.items || null);
+          if (Array.isArray(arr)) {
+            var html = "";
+            arr.slice(0, 10).forEach(function (it) {
+              html += '<div class="mono" style="font-size:0.75rem; color:var(--text); background:var(--surface); border-radius:4px; padding:0.4rem 0.6rem; overflow-x:auto; margin-bottom:0.35rem;">' +
+                esc(JSON.stringify(it).slice(0, 160)) + "</div>";
+            });
+            bodyEl.innerHTML = html;
+          } else {
+            bodyEl.innerHTML = '<div class="mono" style="font-size:0.75rem; color:var(--text); background:var(--surface); border-radius:4px; padding:0.6rem; max-height:160px; overflow:auto;">' +
+              esc(JSON.stringify(data, null, 2).slice(0, 800)) + "</div>";
+          }
+        })
+        .catch(function () {
+          bodyEl.innerHTML = '<div class="err" style="margin-top:0;">Couldn\'t fetch this source — check the URL supports CORS and returns JSON.</div>';
+        });
+    }
+
+    div.querySelector('[data-action="refresh"]').addEventListener("click", load);
+    div.querySelector('[data-action="remove"]').addEventListener("click", function () { div.remove(); });
+
+    load();
+  }
+
+  document.getElementById("feed-connect-btn").addEventListener("click", function () {
+    var input = document.getElementById("feed-url-input");
+    var url = input.value.trim();
+    if (!url) return;
+    addCustomSource(url);
+    input.value = "";
+  });
+  document.getElementById("feed-url-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("feed-connect-btn").click();
+  });
+
+  // ---------- paper trading panel ----------
+  async function loadPaperTrades() {
+    var btn = document.getElementById("paper-refresh");
+    var statsEl = document.getElementById("paper-stats");
+    var bodyEl = document.getElementById("paper-body");
+    var tsEl = document.getElementById("paper-timestamp");
+    btn.textContent = "REFRESHING…";
+    try {
+      var res = await fetch(
+        SUPABASE_URL + "/rest/v1/auspex_paper_trades?select=*&order=entry_time.desc&limit=30",
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY } }
+      );
+      if (!res.ok) throw new Error("Status " + res.status);
+      var allTrades = await res.json();
+      btn.textContent = "REFRESH";
+
+      var testCount = allTrades.filter(function (t) { return t.test_mode; }).length;
+      var trades = allTrades.filter(function (t) { return !t.test_mode; }); // never let test-mode rows into real stats
+
+      var total = trades.length;
+      var graduated = trades.filter(function (t) { return t.outcome === "graduated"; }).length;
+      var closed = trades.filter(function (t) { return t.status === "closed"; });
+      var withFinalPnl = closed.filter(function (t) { return t.final_pnl_pct != null; });
+      var wins = withFinalPnl.filter(function (t) { return t.final_pnl_pct > 0; }).length;
+
+      var statsHtml = '<div class="mono" style="font-size:0.78rem; color:var(--textDim); display:flex; gap:1.2rem; flex-wrap:wrap;">' +
+        "<span>" + total + " tracked (last 30)</span>" +
+        "<span>" + graduated + " graduated</span>" +
+        "<span>" + withFinalPnl.length + " completed full cycle</span>" +
+        (withFinalPnl.length > 0 ? "<span style='color:var(--gold); font-weight:700;'>" + wins + "/" + withFinalPnl.length + " positive at 24h</span>" : "") +
+        (testCount > 0 ? "<span style='color:var(--rust);'>⚠ " + testCount + " test-mode row" + (testCount === 1 ? "" : "s") + " hidden — run the cleanup delete when ready</span>" : "") +
+        "</div>";
+      statsEl.innerHTML = statsHtml;
+
+      lastLoadedPaperTrades = trades;
+
+      if (trades.length === 0) {
+        bodyEl.innerHTML = '<div class="dim-note">No paper trades yet — these accumulate as new launches come in and clear the wallet-freshness check.</div>';
+      } else {
+        var html = '<div style="display:grid; gap:0.35rem;">';
+        trades.forEach(function (t, idx) {
+          var outcomeBadge;
+          if (t.outcome === "graduated") {
+            outcomeBadge = '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">🎓 graduated</span>';
+          } else if (t.outcome === "no_graduation_timeout") {
+            outcomeBadge = '<span class="mono tag" style="color:var(--rust); border-color:var(--rust);">✗ never graduated</span>';
+          } else {
+            outcomeBadge = '<span class="mono tag" style="color:var(--textDim);">watching…</span>';
+          }
+          var pnlBadge = "";
+          if (t.final_pnl_pct != null) {
+            var pos = t.final_pnl_pct >= 0;
+            pnlBadge = '<span class="mono" style="font-size:0.8rem; font-weight:700; color:' + (pos ? "var(--teal)" : "var(--rust)") + ';">' +
+              (pos ? "+" : "") + Number(t.final_pnl_pct).toFixed(1) + "% @24h</span>";
+          } else {
+            var lastCheckpoint = (t.snapshots || []).filter(function (s) { return s.type === "checkpoint"; }).slice(-1)[0];
+            if (lastCheckpoint) {
+              var lpos = lastCheckpoint.pnlPctFromGraduation >= 0;
+              pnlBadge = '<span class="mono" style="font-size:0.75rem; color:' + (lpos ? "var(--teal)" : "var(--rust)") + ';">' +
+                (lpos ? "+" : "") + Number(lastCheckpoint.pnlPctFromGraduation).toFixed(1) + "% @" + lastCheckpoint.atMinutes + "min</span>";
+            }
+          }
+          var walletTag = t.entry_features && t.entry_features.walletAgeLabel
+            ? '<span class="mono tag" style="color:var(--textDim);">' + esc(t.entry_features.walletAgeLabel) + " wallet</span>"
+            : "";
+          var precedentTag = "";
+          var precedentCaveat = "";
+          var prec = t.entry_features && t.entry_features.precedent;
+          if (prec) {
+            var precColor = prec.winRate >= 50 ? "var(--teal)" : "var(--rust)";
+            precedentTag = '<span class="mono tag" style="color:' + precColor + "; border-color:" + precColor + ';">\uD83D\uDD0D ' +
+              prec.winRate + "% win rate (n=" + prec.sampleSize + ")</span>";
+            precedentCaveat = '<div class="mono" style="font-size:0.62rem; color:var(--textDim); line-height:1.5; margin-top:0.3rem;">' +
+              "\u21B3 Based on " + prec.sampleSize + " past trades with the same wallet-age bucket and entry size within 3x of this one — small sample, treat as a lean, not a certainty." +
+              "</div>";
+          }
+          var cardBtn = '<button class="ca-btn mono" data-card-idx="' + idx + '" title="Generate a shareable PNL card">\uD83C\uDCCF</button>';
+          html += '<div class="row" style="flex-direction:column; align-items:stretch;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">' +
+              '<div class="row-left">' +
+                '<span class="name" style="font-size:0.85rem;">' + esc(t.name || t.symbol || "unknown") + "</span>" +
+                (t.symbol ? '<span class="sym mono">' + esc(t.symbol) + "</span>" : "") +
+                walletTag + precedentTag + outcomeBadge + cardBtn +
+              "</div>" +
+              '<div class="row-right">' + pnlBadge + "</div>" +
+            "</div>" +
+            precedentCaveat +
+          "</div>";
+        });
+        html += "</div>";
+        bodyEl.innerHTML = html;
+        bodyEl.querySelectorAll("[data-card-idx]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var idx = Number(btn.getAttribute("data-card-idx"));
+            var trade = lastLoadedPaperTrades[idx];
+            if (trade) openTradeCard(trade, true);
+          });
+        });
+      }
+      tsEl.textContent = "Last read " + new Date().toLocaleTimeString() + ".";
+    } catch (e) {
+      btn.textContent = "REFRESH";
+      bodyEl.innerHTML = '<div class="err">Couldn\'t reach the paper_trades table — check the schema is deployed and SUPABASE_URL/ANON_KEY are correct. (' + esc(e.message) + ")</div>";
+    }
+  }
+  // ---------- PNL cards (paper now, real trades later — same drawing function, different watermark) ----------
+  var lastLoadedPaperTrades = [];
+
+  function drawTradeCard(trade, isPaperTrade) {
+    var canvas = document.getElementById("card-canvas");
+    var ctx = canvas.getContext("2d");
+    var W = canvas.width, H = canvas.height;
+
+    var grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, "#1B1D2B");
+    grad.addColorStop(1, "#12131C");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "#C9A15A";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, W - 6, H - 6);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#C9A15A";
+    ctx.font = "700 46px 'Cinzel', serif";
+    ctx.fillText("AUSPEX", W / 2, 100);
+    ctx.font = "400 22px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#8B8AA0";
+    ctx.fillText(isPaperTrade ? "PAPER TRADE" : "SIGNAL RECORD", W / 2, 135);
+
+    ctx.fillStyle = "#E7E4D8";
+    ctx.font = "700 54px 'Inter', sans-serif";
+    ctx.fillText(trade.name || trade.symbol || "unknown", W / 2, 230);
+    if (trade.symbol) {
+      ctx.font = "500 34px 'IBM Plex Mono', monospace";
+      ctx.fillStyle = "#8B8AA0";
+      ctx.fillText(trade.symbol, W / 2, 275);
+    }
+
+    ctx.strokeStyle = "#2C2E42";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(80, 330);
+    ctx.lineTo(W - 80, 330);
+    ctx.stroke();
+
+    ctx.font = "400 26px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#8B8AA0";
+    ctx.textAlign = "left";
+    ctx.fillText("ENTRY", 80, 400);
+    ctx.fillStyle = "#E7E4D8";
+    ctx.font = "500 32px 'IBM Plex Mono', monospace";
+    var entryLine = trade.entry_mcap_sol ? Number(trade.entry_mcap_sol).toFixed(1) + " SOL mcap" : "\u2014";
+    ctx.fillText(entryLine, 80, 440);
+    var walletLabel = trade.entry_features && trade.entry_features.walletAgeLabel ? trade.entry_features.walletAgeLabel + " wallet" : "";
+    if (walletLabel) {
+      ctx.font = "400 24px 'IBM Plex Mono', monospace";
+      ctx.fillStyle = "#8B8AA0";
+      ctx.fillText(walletLabel, 80, 475);
+    }
+
+    ctx.textAlign = "right";
+    ctx.font = "400 26px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#8B8AA0";
+    ctx.fillText("OUTCOME", W - 80, 400);
+    ctx.font = "500 32px 'IBM Plex Mono', monospace";
+    var outcomeText = trade.outcome === "graduated" ? "GRADUATED"
+      : trade.outcome === "no_graduation_timeout" ? "NEVER GRADUATED"
+      : "WATCHING\u2026";
+    ctx.fillStyle = trade.outcome === "graduated" ? "#5FA88F" : trade.outcome === "no_graduation_timeout" ? "#B5533C" : "#8B8AA0";
+    ctx.fillText(outcomeText, W - 80, 440);
+
+    ctx.textAlign = "center";
+    var pnl = trade.final_pnl_pct;
+    var pnlColor = pnl == null ? "#8B8AA0" : (pnl >= 0 ? "#5FA88F" : "#B5533C");
+    ctx.fillStyle = pnlColor;
+    ctx.font = "700 130px 'Inter', sans-serif";
+    var pnlText = pnl == null ? "\u2014" : (pnl >= 0 ? "+" : "") + Number(pnl).toFixed(1) + "%";
+    ctx.fillText(pnlText, W / 2, 680);
+    ctx.font = "400 24px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#8B8AA0";
+    ctx.fillText(pnl == null ? "no completed cycle yet" : "at 24h post-graduation", W / 2, 730);
+
+    var prec = trade.entry_features && trade.entry_features.precedent;
+    if (prec) {
+      ctx.font = "400 24px 'IBM Plex Mono', monospace";
+      ctx.fillStyle = "#C9A15A";
+      ctx.fillText("Historical precedent: " + prec.winRate + "% win rate (n=" + prec.sampleSize + ")", W / 2, 800);
+    }
+
+    ctx.font = "400 20px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#8B8AA0";
+    if (trade.mint) {
+      ctx.fillText(trade.mint.slice(0, 6) + "\u2026" + trade.mint.slice(-6), W / 2, 860);
+    }
+
+    // mandatory watermark for paper trades — non-negotiable, this is what keeps a simulated result
+    // from ever being mistaken for a real one once it's a downloaded, shareable image
+    if (isPaperTrade) {
+      ctx.save();
+      ctx.translate(W / 2, H - 140);
+      ctx.rotate(-0.05);
+      ctx.fillStyle = "rgba(181, 83, 60, 0.9)";
+      ctx.font = "700 40px 'IBM Plex Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("\u26A0 SIMULATED \u2014 NOT REAL MONEY", 0, 0);
+      ctx.restore();
+    }
+
+    ctx.font = "400 20px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#8B8AA0";
+    ctx.textAlign = "center";
+    ctx.fillText(new Date().toLocaleDateString() + " \u00b7 auspex", W / 2, H - 50);
+  }
+
+  function openTradeCard(trade, isPaperTrade) {
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { drawTradeCard(trade, isPaperTrade); });
+    } else {
+      drawTradeCard(trade, isPaperTrade);
+    }
+    document.getElementById("card-modal").style.display = "flex";
+  }
+
+  document.getElementById("card-close-btn").addEventListener("click", function () {
+    document.getElementById("card-modal").style.display = "none";
+  });
+  document.getElementById("card-modal").addEventListener("click", function (e) {
+    if (e.target.id === "card-modal") document.getElementById("card-modal").style.display = "none";
+  });
+  document.getElementById("card-download-btn").addEventListener("click", function () {
+    var canvas = document.getElementById("card-canvas");
+    var link = document.createElement("a");
+    link.download = "auspex-card.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  });
+
+  document.getElementById("paper-refresh").addEventListener("click", loadPaperTrades);
+
+  // ---------- manual CA scanner ----------
+  async function scanContractAddress() {
+    var input = document.getElementById("scan-ca-input");
+    var btn = document.getElementById("scan-ca-btn");
+    var resultEl = document.getElementById("scan-result");
+    var address = input.value.trim();
+    if (!address) return;
+
+    btn.textContent = "SCANNING…";
+    resultEl.innerHTML = '<div class="dim-note">Checking Solana and Base…</div>';
+
+    var CHAINS_TO_TRY = ["solana", "base"];
+    var found = null;
+
+    try {
+      for (var i = 0; i < CHAINS_TO_TRY.length; i++) {
+        var chain = CHAINS_TO_TRY[i];
+        var res = await fetch("https://api.dexscreener.com/tokens/v1/" + chain + "/" + encodeURIComponent(address));
+        if (res.ok) {
+          var pairs = await res.json();
+          if (Array.isArray(pairs) && pairs.length > 0) {
+            found = { chain: chain, pair: pairs[0] };
+            break;
+          }
+        }
+      }
+
+      btn.textContent = "SCAN";
+
+      if (!found) {
+        resultEl.innerHTML = '<div class="dim-note">No DexScreener pair found on Solana or Base for this address — check it\'s correct, or it may be too new / on a chain we don\'t cover.</div>';
+        return;
+      }
+
+      var p = found.pair;
+      var changeHTML = p.priceChange && p.priceChange.h24 != null
+        ? '<span class="chg mono" style="color:' + (p.priceChange.h24 >= 0 ? "var(--teal)" : "var(--rust)") + '; font-size:0.9rem;">' +
+          (p.priceChange.h24 >= 0 ? "+" : "") + Number(p.priceChange.h24).toFixed(1) + "% (24h)</span>"
+        : "";
+      var liqHTML = p.liquidity && p.liquidity.usd != null
+        ? '<div class="mono" style="font-size:0.8rem; color:var(--textDim); margin-top:0.3rem;">Liquidity: $' + Number(p.liquidity.usd).toLocaleString() + "</div>"
+        : "";
+      var volHTML = p.volume && p.volume.h24 != null
+        ? '<div class="mono" style="font-size:0.8rem; color:var(--textDim);">24h volume: $' + Number(p.volume.h24).toLocaleString() + "</div>"
+        : "";
+
+      var html = '<div class="panel" style="background:var(--bg); border-color:var(--gold); margin-top:0.5rem;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:0.5rem;">' +
+          '<div><span class="name" style="font-size:1rem;">' + esc(p.baseToken ? p.baseToken.name : "unknown") + "</span> " +
+          '<span class="sym mono">' + esc(p.baseToken ? p.baseToken.symbol : "") + "</span> " +
+          '<span class="mono tag" style="color:var(--teal);">' + esc(found.chain) + "</span></div>" +
+          changeHTML +
+        "</div>" +
+        '<div class="mono" style="font-size:0.85rem; color:var(--text); margin-top:0.4rem;">$' +
+          (Number(p.priceUsd) < 0.01 ? Number(p.priceUsd).toExponential(2) : Number(p.priceUsd).toFixed(6)) + "</div>" +
+        liqHTML + volHTML +
+        '<div id="scan-rugcheck" style="margin-top:0.6rem;"></div>' +
+        '<a href="' + esc(p.url || "#") + '" target="_blank" rel="noopener noreferrer" class="mono" style="font-size:0.75rem; color:var(--gold); display:inline-block; margin-top:0.5rem;">View on DexScreener \u2197</a>' +
+      "</div>";
+      resultEl.innerHTML = html;
+
+      if (found.chain === "solana") {
+        var rcEl = document.getElementById("scan-rugcheck");
+        rcEl.innerHTML = '<div class="dim-note" style="margin-top:0;">Running RugCheck…</div>';
+        try {
+          var rcRes = await fetch("https://api.rugcheck.xyz/v1/tokens/" + encodeURIComponent(address) + "/report");
+          if (rcRes.ok) {
+            var rcData = await rcRes.json();
+            var score = rcData.score_normalised;
+            var risks = (rcData.risks || []).map(function (r) { return r.name; }).filter(Boolean);
+            var tier = score <= 30 ? "safe" : score <= 60 ? "caution" : "danger";
+            var tierMap = {
+              safe: ["\uD83D\uDFE2", "var(--teal)", "SAFE"],
+              caution: ["\uD83D\uDFE1", "var(--gold)", "CAUTION"],
+              danger: ["\uD83D\uDD34", "var(--rust)", "DANGER"],
+            };
+            var t = tierMap[tier];
+            var riskList = risks.length > 0
+              ? '<div class="mono" style="font-size:0.75rem; color:var(--textDim); margin-top:0.3rem;">Flags: ' + esc(risks.join(", ")) + "</div>"
+              : '<div class="mono" style="font-size:0.75rem; color:var(--textDim); margin-top:0.3rem;">No specific flags returned.</div>';
+            rcEl.innerHTML = '<span class="mono tag" style="color:' + t[1] + "; border-color:" + t[1] + ';">' + t[0] + " RugCheck: " + t[2] + " (" + score + "/100)</span>" + riskList;
+          } else {
+            rcEl.innerHTML = '<div class="dim-note" style="margin-top:0;">RugCheck didn\'t return a report for this address.</div>';
+          }
+        } catch (e) {
+          rcEl.innerHTML = '<div class="err" style="margin-top:0;">RugCheck lookup failed.</div>';
+        }
+      }
+    } catch (e) {
+      btn.textContent = "SCAN";
+      resultEl.innerHTML = '<div class="err">Scan failed: ' + esc(e.message) + "</div>";
+    }
+  }
+
+  document.getElementById("scan-ca-btn").addEventListener("click", scanContractAddress);
+  document.getElementById("scan-ca-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") scanContractAddress();
+  });
+
+  // ---------- hall of fame (reference only) ----------
+  async function loadHallOfFame() {
+    var bodyEl = document.getElementById("hof-body");
+    try {
+      var res = await fetch(
+        SUPABASE_URL + "/rest/v1/auspex_hall_of_fame?select=*&order=peak_mcap_usd.desc.nullslast&limit=20",
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY } }
+      );
+      if (!res.ok) throw new Error("Status " + res.status);
+      var rows = await res.json();
+      if (rows.length === 0) {
+        bodyEl.innerHTML = '<div class="dim-note">Empty — run backfill-hall-of-fame.js to populate this.</div>';
+        return;
+      }
+      var html = '<div style="display:grid; gap:0.35rem;">';
+      rows.forEach(function (r, idx) {
+        var peakHTML = r.peak_mcap_usd ? '<span class="mono" style="font-size:0.75rem; color:var(--gold);">peak $' + Number(r.peak_mcap_usd).toLocaleString() + "</span>" : "";
+        var curHTML = r.current_mcap_usd ? '<span class="mono" style="font-size:0.7rem; color:var(--textDim);">now $' + Number(r.current_mcap_usd).toLocaleString() + "</span>" : "";
+        html += '<div class="row" style="padding:0.4rem 0.6rem;">' +
+          '<div class="row-left">' +
+            '<span class="idx-dim mono">' + (idx + 1) + "</span>" +
+            '<span class="name" style="font-size:0.85rem;">' + esc(r.name || r.symbol || "unknown") + "</span>" +
+            (r.symbol ? '<span class="sym mono">' + esc(r.symbol) + "</span>" : "") +
+            '<span class="ca-btn mono">' + esc(r.mint.slice(0, 5) + "…" + r.mint.slice(-4)) + "</span>" +
+          "</div>" +
+          '<div class="row-right">' + curHTML + peakHTML + "</div>" +
+        "</div>";
+      });
+      html += "</div>";
+      bodyEl.innerHTML = html;
+    } catch (e) {
+      bodyEl.innerHTML = '<div class="err">Couldn\'t reach the hall_of_fame table. (' + esc(e.message) + ")</div>";
+    }
+  }
+
+  // ---------- initial load ----------
+  loadFromCache();
+  loadPaperTrades();
+  loadHallOfFame();
+  statusText();
+})();
+</script>
+
+</body>
+</html>
