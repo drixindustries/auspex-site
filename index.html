@@ -1029,7 +1029,7 @@
 
   // ---------- Early-curve paper ----------
   var EXIT_LABEL = { tp_25k: "TP $25k", bond: "bond", ladder_complete: "ladder done", trailing_stop: "trailing stop", hard_stop: "hard stop", time_stop: "time stop", max_hold: "max hold",
-    dev_sold: "dev sold", cohort_selldown: "cohort dump", rugged: "rugged", liquidity_pull: "liquidity pulled", dead_curve: "dead curve", worker_restart: "worker restart" };
+    dev_sold: "dev sold", cohort_selldown: "cohort dump", first10_selldown: "first-10 selling", rugged: "rugged", liquidity_pull: "liquidity pulled", dead_curve: "dead curve", worker_restart: "worker restart" };
   function earlyStatsHTML(name, s) {
     if (!s) return "";
     var cell = function (k, v, t) { return '<div title="' + esc(t || "") + '"><div class="k mono">' + k + '</div><div class="v mono">' + v + "</div></div>"; };
