@@ -9,6 +9,7 @@ It is a single `index.html` with no build step. It reads a shared cache from Sup
 | Panel | Source |
 |---|---|
 | Signal Feed, Raw feeds, Just Launched, Just Graduated, hot themes, SOL regime | `auspex_signal_cache` row `latest` (written by the worker) |
+| Signal Performance, "since signal" chips | `auspex_signal_cache` row `latest`: `signalPerformance` (aggregates) and `signalPerf` on each tracked row. Both are computed by the worker from `auspex_signal_outcomes`. |
 | Paper Trading | `auspex_paper_trades` |
 | Hall of Fame | `auspex_hall_of_fame` |
 | CA scanner | DexScreener `tokens/v1` and RugCheck report, called from the browser |
@@ -31,9 +32,26 @@ These badges come from the worker's payload. Hover any badge to see the matching
 
 A row with a bad match gets a red border, or a dashed amber border if the only match is heuristic. Bad flags always take priority over good ones.
 
+## Signal performance
+
+The **📊 Signal Performance** panel shows what happened after Auspex surfaced a signal. It covers the last 7 days.
+
+- **Breakdowns:** type (top signal, launch, graduation), source, badge, score band and chain.
+- **Columns:**
+  - N;
+  - hit +50% and 2×: reached that before falling -50%, counted over resolved signals, with hits/resolved shown next to the rate;
+  - rug rate;
+  - median return at 5m, 15m, 1h, 6h and 24h;
+  - median max-up.
+- Click a header to sort; empty cells always sort last.
+- Rows with fewer than 10 signals are dimmed.
+- On phones the table scrolls sideways with the group column pinned.
+
+Tracked rows in the Signal Feed, Just Launched and Just Graduated show a chip such as **+34% since signal · 12m**. It turns red, with ☠, if RugCheck marked the token rugged or its liquidity collapsed. Hover the chip for the checkpoints, max up and down, and the entry basis. Definitions and caps are in the worker README, under "Signal performance".
+
 ## Configuration
 
-The Supabase project URL and **anon** key are set near the top of the `<script>` in `index.html`. They are designed to be public; RLS limits the anon key to read-only access (the tables above plus `auspex_bad_actors` and `auspex_good_devs`). **Never put the `service_role` key in this repo.**
+The Supabase project URL and **anon** key are set near the top of the `<script>` in `index.html`. They are designed to be public; RLS limits the anon key to read-only access (the tables above plus `auspex_bad_actors`, `auspex_good_devs` and `auspex_signal_outcomes`). **Never put the `service_role` key in this repo.**
 
 The database schema, including the RLS policies, is in the worker repo: [`auspex-schema.sql`](https://github.com/drixindustries/auspex-worker/blob/main/auspex-schema.sql). It was reconstructed from the code (added in auspex-worker PR #1) and should be diffed against the live project before applying.
 
