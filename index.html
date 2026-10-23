@@ -83,6 +83,32 @@
     padding: 1rem; margin-top: 0.75rem;
   }
   .locked { opacity: 0.6; }
+  /* Signal performance */
+  .perf-chip { font-size: 0.66rem; border: 1px solid currentColor; border-radius: 10px; padding: 0.05rem 0.45rem; white-space: nowrap; cursor: help; }
+  .perf-tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.8rem; }
+  .perf-tab { background: transparent; color: var(--textDim); border: 1px solid var(--line); border-radius: 5px; padding: 0.25rem 0.55rem; font-size: 0.68rem; cursor: pointer; font-family: 'IBM Plex Mono', monospace; }
+  .perf-tab[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
+  .perf-scroll { overflow-x: auto; margin-top: 0.6rem; border: 1px solid var(--line); border-radius: 6px; -webkit-overflow-scrolling: touch; }
+  table.perf { border-collapse: collapse; width: 100%; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; }
+  table.perf th, table.perf td { padding: 0.35rem 0.5rem; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  table.perf th:first-child, table.perf td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; max-width: 11rem; overflow: hidden; text-overflow: ellipsis; }
+  table.perf thead th { color: var(--textDim); font-weight: 500; background: var(--surface); }
+  table.perf thead th button { all: unset; cursor: pointer; }
+  table.perf thead th button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  table.perf thead th[aria-sort="ascending"] button::after { content: " \25B2"; color: var(--gold); }
+  table.perf thead th[aria-sort="descending"] button::after { content: " \25BC"; color: var(--gold); }
+  table.perf tbody tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  table.perf tbody tr.small td { opacity: 0.55; }
+  table.perf td.pos { color: var(--teal); }
+  table.perf td.neg { color: var(--rust); }
+  table.perf td .sub { color: var(--textDim); font-size: 0.6rem; }
+  @media (max-width: 600px) {
+    .wrap { padding: 0 0.75rem; }
+    table.perf { font-size: 0.64rem; }
+    table.perf th, table.perf td { padding: 0.3rem 0.4rem; }
+    table.perf th:first-child, table.perf td:first-child { max-width: 7.5rem; }
+    table.perf td .sub { display: none; }
+  }
   @keyframes sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { #sweep-line { animation: none !important; } }
 </style>
@@ -222,6 +248,36 @@
       </div>
       <div id="graduated-body"></div>
       <div class="footer-note" id="graduated-timestamp">From shared cache, worker-updated live.</div>
+    </div>
+  </div>
+
+  <!-- Signal performance (worker: lib/signal-outcomes.js, table auspex_signal_outcomes) -->
+  <div class="wrap" style="padding-bottom:1.5rem;">
+    <div class="panel" id="perf-panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">📊 Signal Performance — What Happened After the Signal</div>
+          <div class="mono panel-sub">
+            Every top-10 signal per source, every graduation, and a sample of launches (1 in 50 at random, plus
+            every launch with a notable creator/RugCheck/theme badge) is recorded the moment Auspex first shows
+            it, then re-priced on DexScreener (GeckoTerminal for fresh bonding-curve tokens) at 5m, 15m, 1h, 6h
+            and 24h. <b>Hit +50% / 2×</b> = reached +50% / +100% before it ever fell −50%, counted over signals
+            that have resolved (hit, hit −50% first, or 24h passed). Highs and lows are sampled (every 90s in the
+            first hour, then every 10–30 min), so short wicks between samples are missed. <b>Rug</b> = RugCheck
+            marked it rugged or pool liquidity fell ≥90% from its peak. Medians use on-time checkpoints only.
+            Rows with fewer than 10 signals are dimmed — too few to mean much. Past results, not predictions.
+          </div>
+        </div>
+      </div>
+      <div class="perf-tabs" role="group" aria-label="Break down by">
+        <button class="perf-tab" data-dim="kind" aria-pressed="true">Type</button>
+        <button class="perf-tab" data-dim="source" aria-pressed="false">Source</button>
+        <button class="perf-tab" data-dim="badge" aria-pressed="false">Badge</button>
+        <button class="perf-tab" data-dim="scoreBand" aria-pressed="false">Score</button>
+        <button class="perf-tab" data-dim="chain" aria-pressed="false">Chain</button>
+      </div>
+      <div id="perf-body"></div>
+      <div class="footer-note" id="perf-timestamp">Waiting on first cache read…</div>
     </div>
   </div>
 
@@ -595,6 +651,7 @@
             sourcesBadges + confirmBadge + caBtn + creatorBadges + insightBadges + kolBadge + lunarBadge + altRankBadge + hypeBadge +
           "</div>" +
           '<div class="row-right">' +
+            perfChipHTML(r.signalPerf) +
             changeHTML +
             '<span class="score mono">' + r.score + "</span>" +
           "</div>" +
@@ -602,6 +659,43 @@
         caveatBlock +
       "</div>"
     );
+  }
+
+  // ---------- "since signal" chip (payload: record.signalPerf from the worker's outcome tracker) ----------
+  function fmtPct(v, digits) {
+    if (v == null || !isFinite(v)) return "—";
+    var d = digits == null ? (Math.abs(v) >= 100 ? 0 : 1) : digits;
+    return (v >= 0 ? "+" : "") + Number(v).toFixed(d) + "%";
+  }
+  function fmtAgo(iso) {
+    var ms = Date.now() - new Date(iso).getTime();
+    if (!isFinite(ms) || ms < 0) return "";
+    if (ms < 3600000) return Math.max(1, Math.round(ms / 60000)) + "m";
+    if (ms < 86400000) return Math.round(ms / 3600000) + "h";
+    return Math.round(ms / 86400000) + "d";
+  }
+  var PERF_KIND_LABEL = { top_signal: "top signal", launch: "launch", graduation: "graduation" };
+  function perfChipHTML(p) {
+    if (!p) return "";
+    var age = fmtAgo(p.firstSeenAt);
+    var cps = p.checkpoints || {};
+    var lines = [
+      "Tracked as " + (PERF_KIND_LABEL[p.kind] || p.kind) + " since " + new Date(p.firstSeenAt).toLocaleString() +
+        (p.basis ? " (return on " + p.basis + (p.entryMcapUsd ? ", entry mcap " + fmtUsd(p.entryMcapUsd) : "") + ")" : ""),
+      ["5m", "15m", "1h", "6h", "24h"].map(function (k) { return k + " " + (cps[k] != null ? fmtPct(cps[k]) : "·"); }).join("  "),
+      "Max up " + fmtPct(p.maxUpPct) + " · max drawdown " + fmtPct(p.maxDrawdownPct) + (p.lastAt ? " · last priced " + fmtAgo(p.lastAt) + " ago" : ""),
+    ];
+    if (p.rugged) lines.push("\u2620 RugCheck marked this token rugged.");
+    if (p.liqCollapsed) lines.push("\u2620 Pool liquidity collapsed (\u226590% off its peak).");
+    if (p.status !== "tracking") lines.push("Tracking finished (" + p.status + ").");
+    if (p.returnPct == null) {
+      var waiting = p.basis ? "pricing\u2026" : "awaiting first price\u2026";
+      return '<span class="perf-chip mono" style="color:var(--textDim);" title="' + esc(lines.join("\n")) + '">\u23F1 ' + waiting + "</span>";
+    }
+    var bad = p.rugged || p.liqCollapsed;
+    var color = bad ? "var(--rust)" : p.returnPct >= 0 ? "var(--teal)" : "var(--rust)";
+    return '<span class="perf-chip mono" data-perf-chip style="color:' + color + ';" title="' + esc(lines.join("\n")) + '">' +
+      (bad ? "\u2620 " : "") + fmtPct(p.returnPct) + " since signal" + (age ? " \u00b7 " + age : "") + "</span>";
   }
 
   function tierMapHas(tier) {
@@ -770,6 +864,7 @@
       renderCgPanel(payload.rawCg || []);
       renderLaunchedPanel(payload.justLaunched || [], payload.badActorSources || []);
       renderGraduatedPanel(payload.justGraduated || []);
+      renderPerfPanel(payload.signalPerformance || null);
 
       var ts = new Date(updatedAt).toLocaleString();
       document.getElementById("signal-timestamp").textContent = "Cache last updated by worker at " + ts + " — this page re-reads it every 90s.";
@@ -984,7 +1079,7 @@
           (l.launchpad ? '<span class="mono tag" style="color:var(--textDim);">' + esc(l.launchpad) + "</span>" : "") +
           caBtn + badActorBadge + winnerBadge + insightBadges + walletBadge + xBadge + bundleBadge + metaBadge +
         "</div>" +
-        '<div class="row-right">' + mcapHTML + "</div>" +
+        '<div class="row-right">' + perfChipHTML(l.signalPerf) + mcapHTML + "</div>" +
       "</div>";
     });
     html += "</div>" + badActorSourcesNoteHTML(badActorSources);
@@ -1033,12 +1128,143 @@
           (g.launchpad ? '<span class="mono tag" style="color:var(--textDim);">' + esc(g.launchpad) + "</span>" : "") +
           caBtn + gExtra +
         "</div>" +
+        (g.signalPerf ? '<div class="row-right">' + perfChipHTML(g.signalPerf) + "</div>" : "") +
       "</div>";
     });
     html += "</div>";
     body.innerHTML = html;
     attachCopyHandlers(body);
   }
+
+  // ---------- signal performance table (payload.signalPerformance, aggregated by the worker) ----------
+  var PERF_BADGE_LABEL = {
+    rc_safe: "\uD83D\uDFE2 RugCheck safe", rc_caution: "\uD83D\uDFE1 RugCheck caution", rc_danger: "\uD83D\uDD34 RugCheck danger",
+    rc_rugged: "\u2620 Rugged", rc_insiders: "\uD83D\uDD78 Insiders", serial_launcher: "\uD83D\uDD01 Serial launcher",
+    dev_proven: "\uD83C\uDFC6 Proven dev", dev_promising: "\u2B50 Promising dev",
+    bad_sanctioned: "\u26D4 Sanctioned", bad_confirmed: "\uD83D\uDEA8 Rug dev (confirmed)", bad_suspected: "\u26A0\uFE0F Rug dev (suspected)",
+    bad_heuristic: "\u26A0\uFE0F Heuristic list", kol_buy: "\uD83C\uDFAF KOL buy", hot_meta: "\uD83D\uDD25 Hot theme",
+    multi_source: "\u00d72+ providers", wallet_brand_new: "\uD83D\uDD34 Brand-new wallet", bundle_high: "\uD83D\uDD34 Bundle risk high",
+    "(none)": "no badge",
+  };
+  var PERF_SOURCE_LABEL = {
+    DEX: "DexScreener top boosts", DEXBOOST: "DexScreener latest boosts", DEXPROFILE: "DexScreener new profiles",
+    CG: "CoinGecko trending", GT: "GeckoTerminal trending", GTNEW: "GeckoTerminal new pools",
+  };
+  function perfValueLabel(dim, v) {
+    if (dim === "kind") return { top_signal: "Top signals", launch: "Launches", graduation: "Graduations" }[v] || v;
+    if (dim === "badge") return PERF_BADGE_LABEL[v] || v;
+    if (dim === "source") {
+      if (PERF_SOURCE_LABEL[v]) return PERF_SOURCE_LABEL[v];
+      if (v.indexOf("LAUNCH:") === 0) return "Launch \u00b7 " + v.slice(7);
+      if (v.indexOf("GRAD:") === 0) return "Graduation \u2192 " + v.slice(5);
+      return v;
+    }
+    if (dim === "scoreBand") return v === "unscored" ? "unscored (launch/grad)" : "score " + v;
+    if (dim === "chain") return v.charAt(0).toUpperCase() + v.slice(1);
+    return v;
+  }
+  var PERF_COLS = [
+    { key: "value", label: "Group", get: function (r) { return r.label; } },
+    { key: "n", label: "N", get: function (r) { return r.n; }, title: "Signals recorded in the window" },
+    { key: "hit50", label: "Hit +50%", get: function (r) { return r.hit50 ? r.hit50.ratePct : null; }, title: "Reached +50% before -50% (resolved signals only)" },
+    { key: "hit100", label: "2\u00d7", get: function (r) { return r.hit100 ? r.hit100.ratePct : null; }, title: "Reached +100% before -50% (resolved signals only)" },
+    { key: "rug", label: "Rug", get: function (r) { return r.rugRatePct; }, title: "RugCheck rugged or liquidity collapsed" },
+    { key: "m5m", label: "Med 5m", cp: "5m" },
+    { key: "m15m", label: "15m", cp: "15m" },
+    { key: "m1h", label: "1h", cp: "1h" },
+    { key: "m6h", label: "6h", cp: "6h" },
+    { key: "m24h", label: "24h", cp: "24h" },
+    { key: "maxUp", label: "Med max \u2191", get: function (r) { return r.medianMaxUpPct; }, title: "Median of each finished signal's highest sampled return" },
+  ];
+  PERF_COLS.forEach(function (c) {
+    if (c.cp) {
+      c.get = function (r) { return r.median ? r.median[c.cp] : null; };
+      c.title = "Median return at " + c.cp + " (on-time checkpoints only)";
+    }
+  });
+  var perfState = { dim: "kind", sortKey: "n", sortDir: "desc", data: null };
+  var PERF_MIN_N = 10;
+
+  function perfCellHTML(col, r) {
+    var v = col.get(r);
+    if (col.key === "value") return '<td title="' + esc(r.value) + '">' + esc(r.label) + "</td>";
+    if (col.key === "n") return "<td>" + r.n + "</td>";
+    if (col.key === "hit50" || col.key === "hit100") {
+      var h = r[col.key];
+      if (!h || !h.decided) return '<td title="No resolved signals yet">\u2014</td>';
+      return '<td class="' + (v >= 50 ? "pos" : "") + '" title="' + h.hits + " of " + h.decided + ' resolved">' + Number(v).toFixed(0) + '%<span class="sub"> ' + h.hits + "/" + h.decided + "</span></td>";
+    }
+    if (col.key === "rug") return "<td" + (v > 0 ? ' class="neg"' : "") + ">" + (v == null ? "\u2014" : Number(v).toFixed(0) + "%") + "</td>";
+    var samples = col.cp && r.samples ? r.samples[col.cp] : null;
+    var cls = v == null ? "" : v >= 0 ? "pos" : "neg";
+    return '<td class="' + cls + '"' + (samples != null ? ' title="' + samples + ' sample(s)"' : "") + ">" + fmtPct(v) + (samples ? '<span class="sub"> n' + samples + "</span>" : "") + "</td>";
+  }
+
+  function renderPerfPanel(perf) {
+    perfState.data = perf || perfState.data;
+    var body = document.getElementById("perf-body");
+    var tsEl = document.getElementById("perf-timestamp");
+    var d = perfState.data;
+    if (!d || !d.rows) {
+      body.innerHTML = '<div class="dim-note">No performance data yet \u2014 the worker starts recording signals on its first cycle; the first checkpoint lands 5 minutes later.</div>';
+      tsEl.textContent = "Aggregated by the worker from auspex_signal_outcomes.";
+      return;
+    }
+    var dim = perfState.dim;
+    var rows = d.rows.filter(function (r) { return r.dim === dim; }).map(function (r) {
+      return Object.assign({}, r, { label: perfValueLabel(dim, r.value) });
+    });
+    var all = d.rows.filter(function (r) { return r.dim === "all"; })[0];
+    var col = PERF_COLS.filter(function (c) { return c.key === perfState.sortKey; })[0] || PERF_COLS[1];
+    var dir = perfState.sortDir === "asc" ? 1 : -1;
+    rows.sort(function (a, b) {
+      var va = col.get(a), vb = col.get(b);
+      if (va == null && vb == null) return b.n - a.n;
+      if (va == null) return 1; // empty cells always last
+      if (vb == null) return -1;
+      if (typeof va === "string") return dir * va.localeCompare(vb);
+      return dir * (va - vb) || b.n - a.n;
+    });
+    var html = '<div class="perf-scroll"><table class="perf"><thead><tr>';
+    PERF_COLS.forEach(function (c) {
+      var sort = c.key === perfState.sortKey ? (perfState.sortDir === "asc" ? "ascending" : "descending") : "none";
+      html += '<th scope="col" aria-sort="' + sort + '"' + (c.title ? ' title="' + esc(c.title) + '"' : "") + '><button type="button" data-sort="' + c.key + '">' + esc(c.label) + "</button></th>";
+    });
+    html += "</tr></thead><tbody>";
+    if (!rows.length) html += '<tr><td colspan="' + PERF_COLS.length + '" style="text-align:left;">No signals in this breakdown yet.</td></tr>';
+    rows.forEach(function (r) {
+      html += '<tr class="' + (r.n < PERF_MIN_N ? "small" : "") + '"' + (r.n < PERF_MIN_N ? ' title="Fewer than ' + PERF_MIN_N + ' signals \u2014 too few to read much into"' : "") + ">";
+      PERF_COLS.forEach(function (c) { html += perfCellHTML(c, r); });
+      html += "</tr>";
+    });
+    html += "</tbody></table></div>";
+    if (all) {
+      html += '<div class="mono dim-note" style="font-size:0.66rem; margin-top:0.5rem;">All signals: ' + all.n + " recorded \u00b7 hit +50% " +
+        (all.hit50 && all.hit50.decided ? all.hit50.ratePct + "% of " + all.hit50.decided + " resolved" : "\u2014") + " \u00b7 2\u00d7 " +
+        (all.hit100 && all.hit100.decided ? all.hit100.ratePct + "% of " + all.hit100.decided : "\u2014") + " \u00b7 median 15m " + fmtPct(all.median && all.median["15m"]) +
+        " \u00b7 " + (d.tracking != null ? d.tracking + " still being tracked" : "") + "</div>";
+    }
+    body.innerHTML = html;
+    tsEl.textContent = "Last " + (d.windowDays || 7) + " days \u00b7 aggregated by the worker at " + new Date(d.generatedAt).toLocaleString() +
+      " \u00b7 a signal with several sources/badges counts in each of those rows.";
+  }
+
+  document.getElementById("perf-panel").addEventListener("click", function (e) {
+    var tab = e.target.closest("[data-dim]");
+    if (tab) {
+      perfState.dim = tab.getAttribute("data-dim");
+      document.querySelectorAll("#perf-panel .perf-tab").forEach(function (b) { b.setAttribute("aria-pressed", b === tab ? "true" : "false"); });
+      renderPerfPanel();
+      return;
+    }
+    var sortBtn = e.target.closest("[data-sort]");
+    if (sortBtn) {
+      var key = sortBtn.getAttribute("data-sort");
+      if (perfState.sortKey === key) perfState.sortDir = perfState.sortDir === "asc" ? "desc" : "asc";
+      else { perfState.sortKey = key; perfState.sortDir = key === "value" ? "asc" : "desc"; }
+      renderPerfPanel();
+    }
+  });
 
   // ---------- auto-refresh: re-reads the cache every 90s, matching the worker's cadence ----------
   var INTERVAL_SEC = 90;
