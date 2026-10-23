@@ -63,6 +63,9 @@
   .section-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--teal); letter-spacing: 0.1em; margin: 1.1rem 0 0.5rem; }
   .section-label.dim { color: var(--textDim); }
   .err { color: var(--rust); font-size: 0.85rem; margin-top: 0.9rem; }
+  #cache-banner { position: sticky; top: 0; z-index: 50; display: none; padding: 0.7rem 1rem; text-align: center;
+    font-size: 0.8rem; line-height: 1.45; color: #F3E9D2; background: rgba(181, 83, 60, 0.95); border-bottom: 2px solid var(--gold); }
+  #cache-banner strong { color: #fff; }
   .dim-note { color: var(--textDim); font-size: 0.85rem; margin-top: 0.9rem; }
   .footer-note { font-size: 0.7rem; color: var(--textDim); margin-top: 0.9rem; }
   input[type=text] {
@@ -85,6 +88,7 @@
 </style>
 </head>
 <body>
+<div id="cache-banner" class="mono" role="alert" aria-live="polite"></div>
 
   <!-- Hero -->
   <div class="wrap" style="padding-top:3rem; padding-bottom:2rem; display:flex; gap:2rem; flex-wrap:wrap; align-items:center;">
@@ -155,9 +159,11 @@
         <div>
           <div class="panel-title lg">⚡ Signal Feed — by Chain, by CA</div>
           <div class="mono panel-sub">
-            DexScreener + CoinGecko + GeckoTerminal (Solana &amp; Base), grouped by chain then by exact
-            contract address. A "confirmed" badge means the same CA showed up in more than one source —
-            a real match, not a ticker guess. CoinGecko coins without a resolvable on-chain address
+            DexScreener (top boosts, latest boosts, latest profiles) + CoinGecko trending + GeckoTerminal
+            (trending and brand-new pools, Solana &amp; Base), grouped by chain then by exact contract address.
+            A "confirmed" badge means the same CA showed up from more than one provider — a real match, not a
+            ticker guess. The score rewards healthy upward momentum, liquidity and freshness, and penalizes
+            dumps and thin pools (under $5k liquidity). CoinGecko coins without a resolvable on-chain address
             (top 8 checked) fall into "No CA available" below. Solana rows may show a RugCheck safety
             badge (🟢🟡🔴) — hover it for the risk score and specific flags. Served from a shared cache
             updated every 90 seconds by a background worker — not fetched fresh per visitor.
@@ -183,13 +189,18 @@
           <div class="mono panel-sub">
             Live via PumpPortal WebSocket — covers both major Solana launchpads on one connection.
             The moment a token is created, before it has any volume, boosts, or trending status anywhere
-            else. No RugCheck applied here — most of these die in minutes. Each may get a 🔴/🟡/🟢 creator
+            else. Most of these die in minutes. Each may get a 🔴/🟡/🟢 creator
             wallet-age badge (Helius) and a 🔴/🟡/🟢 X-account-age badge (X API, when a linked handle is
-            found) — both experience/age only, not a rug-history check. A gold-bordered row with
-            🏆 SERIAL WINNER means this exact wallet previously created a Hall of Fame token — a real,
-            verifiable fact when it fires, not a validated predictor of anything. A ⚪/🟢/🟡/🔴 BUNDLE RISK
+            found) — both experience/age only. Creator lists (hover any badge for the source and reason):
+            ⛔ SANCTIONED (OFAC SDN) and 🚨 RUG DEV · CONFIRMED (Auspex's own list: RugCheck-rugged token or
+            2+ post-graduation liquidity collapses) are solid red; ⚠️ SUSPECTED RUG DEV (one collapse) is
+            outlined; ⚠️ HEURISTIC LIST · UNVERIFIED (third-party automated list, known false positives) is
+            dashed amber. 🏆 PROVEN DEV / ⭐ PROMISING DEV means the same wallet had 2+ / 1 earlier tokens
+            that graduated and held, never rugged — a fact about the past, not a prediction; a wallet on
+            any bad list shows the bad flag first. When RugCheck budget allows, creators also get ☠ RUGGED,
+            🕸 INSIDERS DETECTED and 🔁 SERIAL LAUNCHER (many launches ≠ proof of a rug). A ⚪/🟢/🟡/🔴 BUNDLE RISK
             badge appears ~20s after launch (PumpPortal trade-level stream, metered) based on how
-            concentrated the earliest buys were. Rolling window of the last 30.
+            concentrated the earliest buys were. Rolling window of the last 60.
           </div>
         </div>
       </div>
@@ -200,10 +211,11 @@
     <div class="panel">
       <div class="panel-head">
         <div>
-          <div class="panel-title">🎓 Just Graduated — Bonding Curve → Raydium</div>
+          <div class="panel-title">🎓 Just Graduated — Bonding Curve → DEX</div>
           <div class="mono panel-sub">
-            Migrated off a bonding curve (pump.fun or LetsBonk.fun) to a real Raydium pool — meaningfully
-            rarer and higher-signal than a raw launch. Each gets a RugCheck safety pass automatically.
+            Migrated off a bonding curve to a real DEX pool — pump.fun graduates to PumpSwap, LetsBonk.fun to
+            Raydium; each row is labelled with the venue PumpPortal reports. Meaningfully rarer and
+            higher-signal than a raw launch. Each gets a RugCheck safety pass automatically.
             Rolling window of the last 15.
           </div>
         </div>
@@ -220,9 +232,12 @@
         <div>
           <div class="panel-title">🧪 Paper Trading — Simulated, Zero Real Money</div>
           <div class="mono panel-sub">
-            Every qualifying launch gets a simulated buy logged automatically. Tracks whether it graduates
-            (survives to a real Raydium pool) and, if so, real DexScreener price at 5min/30min/2hr/24hr
-            after graduation. Once 5+ comparable past trades exist (same wallet-age bucket, similar entry
+            Simulated buys logged automatically, each tagged with why it was entered: a sample of new launches
+            (every flagged creator, plus RugCheck-checked and random control launches), every graduation, and tokens
+            entering the board's top signals. Launches are tracked to graduation (a real DEX pool — PumpSwap or
+            Raydium); priced trades get real DexScreener checkpoints (most liquid pool) at 5min/30min/1h/2h/6h/24h.
+            Returns are shown from entry (launches: market cap at launch) and, for launches, from graduation.
+            Once 5+ comparable past trades exist (same wallet-age bucket, similar entry
             size), new trades also show a 🔍 precedent badge — a real historical win-rate lookup, not a
             guess. No badge yet means not enough data, not "no signal."
           </div>
@@ -381,15 +396,62 @@
     }
   })();
 
+  // Solana addresses are case-sensitive and the worker now keys them in original case; older cached
+  // payloads keyed everything lower-case, so check both.
+  function lookupByAddress(map, addr) {
+    if (!map || !addr) return null;
+    return map[addr] || map[addr.toLowerCase()] || null;
+  }
+
+  function dexIconUrl(icon) {
+    if (!icon) return null;
+    if (/^https?:\/\//i.test(icon)) return icon;
+    return "https://cdn.dexscreener.com/cms/images/" + encodeURIComponent(icon) + "?width=64&height=64&fit=crop&quality=95&format=auto";
+  }
+
+  // ---------- stale-cache banner ----------
+  var STALE_AFTER_MS = 5 * 60 * 1000;
+  var lastCacheUpdatedAt = null;
+  var lastCacheError = null;
+
+  function formatAge(ms) {
+    var min = Math.floor(ms / 60000);
+    if (min < 60) return min + " min";
+    var hrs = Math.floor(min / 60);
+    if (hrs < 48) return hrs + "h " + (min % 60) + "m";
+    return Math.floor(hrs / 24) + " days";
+  }
+
+  function updateCacheBanner() {
+    var el = document.getElementById("cache-banner");
+    if (!el) return;
+    if (lastCacheError) {
+      el.innerHTML = "<strong>\u26A0 Couldn't read the live signal cache.</strong> Feeds below are not updating (" + esc(lastCacheError) + "). Retrying every 90s.";
+      el.style.display = "block";
+      return;
+    }
+    if (lastCacheUpdatedAt) {
+      var age = Date.now() - new Date(lastCacheUpdatedAt).getTime();
+      if (age > STALE_AFTER_MS) {
+        el.innerHTML = "<strong>\u26A0 Stale data \u2014 last worker update " + esc(formatAge(age)) + " ago</strong> (" +
+          esc(new Date(lastCacheUpdatedAt).toLocaleString()) + "). The background worker may be down; signals below are not live.";
+        el.style.display = "block";
+        return;
+      }
+    }
+    el.style.display = "none";
+  }
+
   // ---------- row rendering (shared by Signal Feed + raw panels) ----------
-  function renderSignalRowHTML(r, idx, keyPrefix, kolBuys, lunarSignals, rugSafety) {
+  function renderSignalRowHTML(r, idx, keyPrefix, kolBuys, lunarSignals, rugSafety, creatorFlags) {
     var key = keyPrefix + "-" + (r.tokenAddress || r.symbol || "row") + "-" + idx;
-    var sourceColor = { DEX: "var(--rust)", CG: "var(--gold)", GT: "var(--teal)" };
+    var sourceColor = { DEX: "var(--rust)", DEXBOOST: "var(--rust)", DEXPROFILE: "var(--rust)", CG: "var(--gold)", GT: "var(--teal)", GTNEW: "var(--teal)" };
     var sourcesBadges = (r.sources || []).map(function (s) {
       return '<span class="mono tag" style="color:' + (sourceColor[s] || "var(--textDim)") + '">' + s + "</span>";
     }).join("");
-    var confirmBadge = r.sources && r.sources.length > 1
-      ? '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">×' + r.sources.length + " confirmed — same CA</span>"
+    var providerCount = r.providerCount != null ? r.providerCount : (r.sources ? r.sources.length : 0);
+    var confirmBadge = providerCount > 1
+      ? '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">×' + providerCount + " confirmed — same CA</span>"
       : "";
     var caBtn = r.tokenAddress
       ? '<button class="ca-btn mono" data-ca="' + esc(r.tokenAddress) + '" data-key="' + key + '">' +
@@ -426,8 +488,8 @@
     }
 
     var rugBadge = "";
-    var rug = rugSafety && r.tokenAddress ? rugSafety[r.tokenAddress.toLowerCase()] : null;
-    if (rug && rug.tier !== "unknown") {
+    var rug = rugSafety && r.tokenAddress ? lookupByAddress(rugSafety, r.tokenAddress) : null;
+    if (rug && tierMapHas(rug.tier)) {
       var tierMap = {
         safe: { emoji: "🟢", label: "SAFE", color: "var(--teal)" },
         caution: { emoji: "🟡", label: "CAUTION", color: "var(--gold)" },
@@ -440,13 +502,23 @@
         ageText = " · " + (ageMin <= 0 ? "just now" : ageMin + "m ago");
       }
       rugBadge = '<span class="mono tag" style="color:' + t.color + "; border-color:" + t.color + ';">' + t.emoji + " " + t.label + esc(ageText) + "</span>";
-      var rugCaveat = "🛡 RugCheck " + rug.riskScore + "/100" + (rug.risks.length ? " — " + rug.risks.join(", ") : "") +
+      var rugCaveat = "🛡 RugCheck " + rug.riskScore + "/100" + (rug.risks && rug.risks.length ? " — " + rug.risks.join(", ") : "") +
         ". Checks contract mechanics only (mint/freeze authority, LP lock, holder concentration) — cannot detect a coordinated group simply selling on the open market.";
       caveats.push(rugCaveat);
     }
+    var insightBadges = rug && rug.insights ? rugInsightBadgesHTML(rug.insights) : "";
+    var creatorFlag = creatorFlags && r.chainId && r.tokenAddress
+      ? creatorFlags[r.chainId + ":" + (r.chainId === "solana" ? r.tokenAddress : r.tokenAddress.toLowerCase())]
+      : null;
+    var creatorBadges = "";
+    if (creatorFlag) {
+      var cfBad = creatorFlag.bad || [];
+      creatorBadges = badActorBadgesHTML(cfBad) + goodDevBadgeHTML(creatorFlag.good, cfBad.length > 0);
+      if (cfBad.length) caveats.push("\uD83D\uDEA8 Creator " + creatorFlag.creator.slice(0, 6) + "\u2026 matched: " + cfBad.map(function (m) { return m.label; }).join(", "));
+    }
 
     var kolBadge = "";
-    var kolHits = kolBuys && r.tokenAddress ? kolBuys[r.tokenAddress.toLowerCase()] : null;
+    var kolHits = kolBuys && r.tokenAddress ? lookupByAddress(kolBuys, r.tokenAddress) : null;
     if (kolHits && kolHits.length > 0) {
       var names = kolHits.slice(0, 2).map(function (h) { return esc(h.kol); }).join(", ");
       var extra = kolHits.length > 2 ? " +" + (kolHits.length - 2) : "";
@@ -520,7 +592,7 @@
             rugBadge +
             nameHtml +
             (r.symbol ? '<span class="sym mono">' + esc(r.symbol) + "</span>" : "") +
-            sourcesBadges + confirmBadge + caBtn + kolBadge + lunarBadge + altRankBadge + hypeBadge +
+            sourcesBadges + confirmBadge + caBtn + creatorBadges + insightBadges + kolBadge + lunarBadge + altRankBadge + hypeBadge +
           "</div>" +
           '<div class="row-right">' +
             changeHTML +
@@ -532,8 +604,110 @@
     );
   }
 
+  function tierMapHas(tier) {
+    return tier === "safe" || tier === "caution" || tier === "danger";
+  }
+
+  // ---------- dev reputation + RugCheck insight badges (worker: lib/wallet-list.js, lib/dev-reputation.js) ----------
+  // Bad-list kinds, strongest first. Distinct styling: sanctioned/confirmed solid, suspected outlined,
+  // heuristic dashed + dim (third-party automated list, unverified, known false positives).
+  var BAD_KIND_STYLE = {
+    sanctioned: { emoji: "\u26D4", label: "SANCTIONED", style: "color:#fff; border-color:var(--rust); background:var(--rust); font-weight:700;" },
+    confirmed: { emoji: "\uD83D\uDEA8", label: "RUG DEV \u00b7 CONFIRMED", style: "color:var(--rust); border-color:var(--rust); background:rgba(181,83,60,0.18); font-weight:700;" },
+    suspected: { emoji: "\u26A0\uFE0F", label: "SUSPECTED RUG DEV", style: "color:var(--rust); border-color:var(--rust); font-weight:600;" },
+    heuristic: { emoji: "\u26A0\uFE0F", label: "HEURISTIC LIST \u00b7 UNVERIFIED", style: "color:var(--gold); border-color:var(--gold); border-style:dashed; opacity:0.9;" },
+  };
+  var BAD_KIND_EXPLAIN = {
+    sanctioned: "On an official sanctions list (US Treasury OFAC SDN, via 0xB10C's extractor). Legal flag, not a rug finding.",
+    confirmed: "Auspex's own rug-dev list, tier confirmed: RugCheck marked one of this wallet's tokens rugged, or 2+ of its graduations lost \u226590% of liquidity within 24h.",
+    suspected: "Auspex's own rug-dev list, tier suspected: one graduation lost \u226590% of liquidity within 24h. One event, not proof.",
+    heuristic: "Third-party automated list (heuristics like rug <1h / spam deployer / honeypot). Unverified and known to have false positives \u2014 treat as a hint only.",
+  };
+
+  function fmtUsd(n) {
+    return n == null ? "?" : "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+
+  // matches: [{ sourceId, kind, label, reason, listedAt, confidence }], strongest first (worker sorts).
+  // One badge per kind; the tooltip names every matching source, its reason, and when it was listed.
+  function badActorBadgesHTML(matches) {
+    if (!matches || !matches.length) return "";
+    var byKind = {};
+    matches.forEach(function (m) { (byKind[m.kind] = byKind[m.kind] || []).push(m); });
+    return ["sanctioned", "confirmed", "suspected", "heuristic"].filter(function (k) { return byKind[k]; }).map(function (k) {
+      var s = BAD_KIND_STYLE[k];
+      var lines = byKind[k].map(function (m) {
+        return "\u2022 " + m.label + (m.reason ? " \u2014 " + m.reason : "") +
+          (m.listedAt ? " (listed " + String(m.listedAt).slice(0, 10) + ")" : "") +
+          (m.confidence != null ? " [confidence " + m.confidence + "]" : "");
+      });
+      var title = BAD_KIND_EXPLAIN[k] + "\nMatched source(s):\n" + lines.join("\n") + "\nA match is a warning signal, not proof.";
+      return '<span class="mono tag" data-bad-kind="' + k + '" style="' + s.style + '" title="' + esc(title) + '">' + s.emoji + " " + s.label +
+        (byKind[k].length > 1 ? " \u00d7" + byKind[k].length : "") + "</span>";
+    }).join("");
+  }
+
+  // good: { tier: proven|promising, winners: [{ symbol, name, mint, marketCapUsd, type }], knownLaunches }
+  // If the wallet is ALSO on any bad list, the good badge is muted and the bad badge leads.
+  function goodDevBadgeHTML(good, alsoBad) {
+    if (!good || !good.tier) return "";
+    var proven = good.tier === "proven";
+    var winners = (good.winners || []).map(function (w) {
+      var tag = w.type === "GRADUATED_HELD" ? "graduated + held 24h (watched by Auspex)" : w.type === "HALL_OF_FAME" ? "Hall of Fame" : "graduated, not rugged, now " + fmtUsd(w.marketCapUsd) + " mcap";
+      return "\u2022 " + (w.symbol || w.name || (w.mint ? w.mint.slice(0, 6) + "\u2026" : "?")) + " \u2014 " + tag;
+    });
+    var title = (proven ? "Proven dev: 2+ prior tokens that graduated and held, and \u226510% of this wallet's known launches." : "Promising dev: 1 prior token that graduated and held.") +
+      (good.knownLaunches ? "\nKnown launches by this wallet (RugCheck): " + good.knownLaunches : "") +
+      "\nPrior winners:\n" + winners.join("\n") +
+      "\nPast results don't guarantee this launch. Wallets with any rugged token never get this badge." +
+      (alsoBad ? "\n\u26A0 This wallet is ALSO on a bad-actor list \u2014 the bad flag takes priority." : "");
+    var style = alsoBad
+      ? "color:var(--textDim); border-color:var(--line); text-decoration:line-through;"
+      : "color:var(--gold); border-color:var(--gold); font-weight:700;" + (proven ? " background:rgba(201,162,39,0.15);" : "");
+    return '<span class="mono tag" data-good-tier="' + esc(good.tier) + '" style="' + style + '" title="' + esc(title) + '">' +
+      (proven ? "\uD83C\uDFC6 PROVEN DEV" : "\u2B50 PROMISING DEV") + (winners.length ? " \u00b7 " + winners.length + " winner" + (winners.length === 1 ? "" : "s") : "") + "</span>";
+  }
+
+  // RugCheck insights: { rugged, insidersDetected, insiderNetworks, insiderNetworkLargest, creatorKnownAs,
+  //                      creatorTokens: { count, lowCapCount, lowCapThresholdUsd, top: [...] } | null }
+  var SERIAL_LAUNCHER_MIN = 3;
+  function rugInsightBadgesHTML(ins) {
+    if (!ins) return "";
+    var html = "";
+    if (ins.rugged) {
+      html += '<span class="mono tag" style="color:#fff; background:var(--rust); border-color:var(--rust); font-weight:700;" title="' +
+        esc("RugCheck's report marks this token as RUGGED (liquidity pulled / token abandoned by insiders). This is RugCheck's own determination.") + '">\u2620 RUGGED</span>';
+    }
+    if (ins.insidersDetected > 0) {
+      html += '<span class="mono tag" style="color:var(--gold); border-color:var(--gold);" title="' +
+        esc("RugCheck's wallet graph found " + ins.insidersDetected + " insider wallet(s) in " + ins.insiderNetworks + " linked network(s)" +
+          (ins.insiderNetworkLargest ? " (largest " + ins.insiderNetworkLargest + " wallets)" : "") +
+          " \u2014 wallets funded from or transferring with each other, often the team or a bundle. Common on launches; a risk signal, not proof of a rug.") +
+        '">\uD83D\uDD78 INSIDERS DETECTED (' + ins.insidersDetected + ")</span>";
+    }
+    var ct = ins.creatorTokens;
+    if (ct && ct.count >= SERIAL_LAUNCHER_MIN) {
+      html += '<span class="mono tag" style="color:var(--textDim); border-color:var(--gold);" title="' +
+        esc("RugCheck lists " + ct.count + " other token(s) created by this wallet; " + ct.lowCapCount + " now under " + fmtUsd(ct.lowCapThresholdUsd) +
+          " market cap (dead or tiny). Serial launching is common and is NOT proof of a rug \u2014 check the creator's history." +
+          (ct.top && ct.top.length ? "\nBiggest: " + ct.top.slice(0, 3).map(function (t) { return t.mint.slice(0, 6) + "\u2026 " + fmtUsd(t.marketCapUsd); }).join(", ") : "")) +
+        '">\uD83D\uDD01 SERIAL LAUNCHER: ' + ct.count + " TOKENS</span>";
+    }
+    if (ins.creatorKnownAs) {
+      html += '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);" title="RugCheck known-account label for the creator wallet">\uD83C\uDFF7 ' + esc(ins.creatorKnownAs) + "</span>";
+    }
+    return html;
+  }
+
+  function badActorSourcesNoteHTML(sources) {
+    if (!sources || !sources.length) return "";
+    return '<div class="dim-note mono" style="font-size:0.6rem; margin-top:0.3rem;" title="Bad-actor sources the worker loaded (refreshed every 6h; a failing source keeps its last good copy)">Creator lists: ' +
+      sources.map(function (s) { return esc(s.id) + " (" + esc(s.kind) + ") " + s.count + (s.ok ? "" : " \u26A0 stale"); }).join(" \u00b7 ") + "</div>";
+  }
+
   function renderDexRowHTML(t, idx) {
-    var iconHTML = t.icon ? '<img src="' + esc(t.icon) + '" alt="" width="18" height="18" style="border-radius:50%;" />' : "";
+    var iconUrl = dexIconUrl(t.icon);
+    var iconHTML = iconUrl ? '<img src="' + esc(iconUrl) + '" alt="" width="18" height="18" style="border-radius:50%;" />' : "";
     var caBtn = t.tokenAddress
       ? '<button class="ca-btn mono" data-ca="' + esc(t.tokenAddress) + '" data-key="dexraw-' + idx + '">' +
         esc(t.tokenAddress.slice(0, 5) + "…" + t.tokenAddress.slice(-4)) + "</button>"
@@ -586,15 +760,18 @@
       if (!rows.length) throw new Error("No cache row found — has the worker run yet?");
       var payload = rows[0].payload;
       var updatedAt = rows[0].updated_at;
+      lastCacheError = null;
+      lastCacheUpdatedAt = updatedAt;
+      updateCacheBanner();
 
       renderGlobalIndicators(payload);
       renderSignalFeed(payload);
       renderDexPanel(payload.rawDex || []);
       renderCgPanel(payload.rawCg || []);
-      renderLaunchedPanel(payload.justLaunched || []);
+      renderLaunchedPanel(payload.justLaunched || [], payload.badActorSources || []);
       renderGraduatedPanel(payload.justGraduated || []);
 
-      var ts = new Date(updatedAt).toLocaleTimeString();
+      var ts = new Date(updatedAt).toLocaleString();
       document.getElementById("signal-timestamp").textContent = "Cache last updated by worker at " + ts + " — this page re-reads it every 90s.";
       document.getElementById("dex-timestamp").textContent = "From shared cache, worker-updated at " + ts + ".";
       document.getElementById("cg-timestamp").textContent = "From shared cache, worker-updated at " + ts + ".";
@@ -605,6 +782,8 @@
       return true;
     } catch (e) {
       [signalBtn, dexBtn, cgBtn].forEach(function (b) { b.textContent = "REFRESH"; });
+      lastCacheError = e.message || "unknown error";
+      updateCacheBanner();
       var msg = '<div class="err">Couldn\'t reach the Supabase cache — check SUPABASE_URL / SUPABASE_ANON_KEY are filled in correctly, and that the worker has run at least once. (' + esc(e.message) + ")</div>";
       document.getElementById("signal-body").innerHTML = msg;
       document.getElementById("dex-body").innerHTML = msg;
@@ -634,7 +813,9 @@
     var metas = payload.activeMetas || [];
     metas.forEach(function (m) {
       html += '<span class="mono tag" style="color:var(--gold); border-color:var(--gold); padding:0.3rem 0.6rem; font-size:0.75rem;" title="' +
-        esc("Recent launches: " + m.examples.join(", ")) + '">\uD83D\uDD25 META: "' + esc(m.keyword) + '" \u00d7' + m.count + "</span>";
+        esc("Recent launches: " + m.examples.join(", ") +
+          (m.distinctCreators != null ? " \u2014 " + m.distinctCreators + " distinct creator wallets, " + m.distinctTokens + " distinct tokens" : "")) +
+        '">\uD83D\uDD25 META: "' + esc(m.keyword) + '" \u00d7' + (m.distinctCreators != null ? m.distinctCreators : m.count) + "</span>";
     });
 
     if (!regime && metas.length === 0) {
@@ -651,6 +832,7 @@
     var kolBuys = payload.kolBuys || {};
     var lunarSignals = payload.lunarSignals || {};
     var rugSafety = payload.rugSafety || {};
+    var creatorFlags = payload.signalCreatorFlags || {};
 
     var chainOrder = Object.keys(chainGroups).sort(function (a, b) {
       var bestA = chainGroups[a][0] ? chainGroups[a][0].score : 0;
@@ -666,13 +848,13 @@
       var rows = chainGroups[chain];
       html += '<div class="section-label">' + esc(chain.toUpperCase()) + " · " + rows.length + " signal" + (rows.length === 1 ? "" : "s") + "</div>";
       html += '<div style="display:grid; gap:0.4rem;">';
-      rows.forEach(function (r, idx) { html += renderSignalRowHTML(r, idx, chain, kolBuys, lunarSignals, rugSafety); });
+      rows.forEach(function (r, idx) { html += renderSignalRowHTML(r, idx, chain, kolBuys, lunarSignals, rugSafety, creatorFlags); });
       html += "</div>";
     });
     if (unmapped.length > 0) {
       html += '<div class="section-label dim">NO CA AVAILABLE · ' + unmapped.length + "</div>";
       html += '<div style="display:grid; gap:0.4rem;">';
-      unmapped.forEach(function (r, idx) { html += renderSignalRowHTML(r, idx, "unmapped", kolBuys, lunarSignals, rugSafety); });
+      unmapped.forEach(function (r, idx) { html += renderSignalRowHTML(r, idx, "unmapped", kolBuys, lunarSignals, rugSafety, creatorFlags); });
       html += "</div>";
     }
     if (chainOrder.length === 0 && unmapped.length === 0) {
@@ -707,7 +889,7 @@
     body.innerHTML = html;
   }
 
-  function renderLaunchedPanel(launches) {
+  function renderLaunchedPanel(launches, badActorSources) {
     var body = document.getElementById("launched-body");
     if (!launches || launches.length === 0) {
       body.innerHTML = '<div class="dim-note">Waiting for the next launch — these come in continuously once live.</div>';
@@ -730,24 +912,38 @@
           var wTitle = l.creatorWallet.txCount + (l.creatorWallet.cappedAt100 ? "+" : "") + " prior transactions from this wallet — age/experience only, not a rug-history check";
           walletBadge = '<span class="mono tag" style="color:' + w.color + "; border-color:" + w.color + ';" title="' + esc(wTitle) + '">' + w.emoji + " " + w.label + "</span>";
         }
-      } else if (l.creator) {
+      } else if (l.creator && l.walletCheck !== "disabled") {
         walletBadge = '<span class="mono tag" style="color:var(--textDim);">checking wallet\u2026</span>';
       }
       var winnerBadge = "";
       var rowStyleOverride = "";
-      if (l.serialWinner && l.serialWinner.length > 0) {
+      var rep = l.devReputation || null;
+      var badMatches = (rep && rep.bad) || l.badActorMatches || [];
+      var isBad = badMatches.length > 0 || !!l.isBadActor;
+      if (rep && rep.good) {
+        winnerBadge = goodDevBadgeHTML(rep.good, isBad);
+        if (!isBad) rowStyleOverride = " border-color:var(--gold); border-width:2px;";
+      } else if (l.serialWinner && l.serialWinner.length > 0) {
+        // older worker payloads: Hall of Fame-only serial winner list
         var priorList = l.serialWinner.map(function (w) {
           return (w.symbol || w.name || "unknown") + (w.peakMcapUsd ? " (peak $" + Number(w.peakMcapUsd).toLocaleString() + ")" : "");
         }).join(", ");
         winnerBadge = '<span class="mono tag" style="color:var(--gold); border-color:var(--gold); font-weight:700;" title="' +
           esc("Same wallet previously created: " + priorList) + '">\uD83C\uDFC6 SERIAL WINNER</span>';
-        rowStyleOverride = ' border-color:var(--gold); border-width:2px;';
+        if (!isBad) rowStyleOverride = " border-color:var(--gold); border-width:2px;";
       }
       var badActorBadge = "";
-      if (l.isBadActor) {
-        badActorBadge = '<span class="mono tag" style="color:var(--rust); border-color:var(--rust); font-weight:700; background:rgba(181,83,60,0.15);" title="Wallet matched against a community blocklist of wallets sold as \u0027aged\u0027 accounts \u2014 a known tactic to make coordinated launches look organic. A match is a warning signal, not proof.">\uD83D\uDEA8 KNOWN BAD ACTOR WALLET</span>';
-        rowStyleOverride = ' border-color:var(--rust); border-width:2px;'; // overrides gold if somehow both — danger takes visual priority
+      if (badMatches.length > 0) {
+        badActorBadge = badActorBadgesHTML(badMatches);
+        // heuristic-only matches get a dashed amber outline; anything stronger takes the solid rust border
+        rowStyleOverride = badMatches[0].kind === "heuristic"
+          ? " border-color:var(--gold); border-style:dashed; border-width:2px;"
+          : " border-color:var(--rust); border-width:2px;";
+      } else if (l.isBadActor) {
+        badActorBadge = '<span class="mono tag" style="color:var(--rust); border-color:var(--rust); font-weight:700; background:rgba(181,83,60,0.15);" title="Creator wallet is on the worker\u0027s bad-actor list. A match is a warning signal, not proof.">\uD83D\uDEA8 KNOWN BAD ACTOR WALLET</span>';
+        rowStyleOverride = " border-color:var(--rust); border-width:2px;";
       }
+      var insightBadges = rugInsightBadgesHTML(l.rugInsights);
       var xBadge = "";
       if (l.xAccountAge && l.xAccountAge.ageLabel) {
         var xMap = {
@@ -785,12 +981,13 @@
         '<div class="row-left">' +
           '<span class="name" style="font-size:0.85rem;">' + esc(l.name || "unnamed") + "</span>" +
           (l.symbol ? '<span class="sym mono">' + esc(l.symbol) + "</span>" : "") +
-          caBtn + badActorBadge + walletBadge + winnerBadge + xBadge + bundleBadge + metaBadge +
+          (l.launchpad ? '<span class="mono tag" style="color:var(--textDim);">' + esc(l.launchpad) + "</span>" : "") +
+          caBtn + badActorBadge + winnerBadge + insightBadges + walletBadge + xBadge + bundleBadge + metaBadge +
         "</div>" +
         '<div class="row-right">' + mcapHTML + "</div>" +
       "</div>";
     });
-    html += "</div>";
+    html += "</div>" + badActorSourcesNoteHTML(badActorSources);
     body.innerHTML = html;
     attachCopyHandlers(body);
   }
@@ -811,7 +1008,9 @@
       var caBtn = '<button class="ca-btn mono" data-ca="' + esc(g.mint) + '" data-key="grad-' + idx + '">' +
         esc(g.mint.slice(0, 5) + "…" + g.mint.slice(-4)) + "</button>";
       var rugBadge = "";
-      if (g.rugSafety && g.rugSafety.tier) {
+      if (g.rugSafety && g.rugSafety.tier === "unavailable") {
+        rugBadge = '<span class="mono tag" style="color:var(--textDim);" title="RugCheck returned no report yet for this mint">no RugCheck report</span>';
+      } else if (g.rugSafety && g.rugSafety.tier) {
         var t = tierMap[g.rugSafety.tier];
         if (t) {
           var riskTitle = "RugCheck score " + g.rugSafety.riskScore + "/100" + (g.rugSafety.risks && g.rugSafety.risks.length ? " — " + g.rugSafety.risks.join(", ") : "");
@@ -820,13 +1019,19 @@
       } else {
         rugBadge = '<span class="mono tag" style="color:var(--textDim);">checking…</span>';
       }
+      var gIns = g.rugSafety && g.rugSafety.insights ? g.rugSafety.insights : null;
+      var gRep = g.devReputation || null;
+      var gBad = (gRep && gRep.bad) || [];
+      var gExtra = rugInsightBadgesHTML(gIns) + badActorBadgesHTML(gBad) + (gRep ? goodDevBadgeHTML(gRep.good, gBad.length > 0) : "");
       var gDexLink = "https://dexscreener.com/solana/" + g.mint;
       html += '<div class="row">' +
         '<div class="row-left">' +
           rugBadge +
-          '<a href="' + esc(gDexLink) + '" target="_blank" rel="noopener noreferrer" class="name" style="text-decoration:none; color:inherit; border-bottom:1px dotted var(--gold);" title="Open chart on DexScreener">' + esc(g.name || "unnamed") + "</a>" +
+          '<a href="' + esc(gDexLink) + '" target="_blank" rel="noopener noreferrer" class="name" style="text-decoration:none; color:inherit; border-bottom:1px dotted var(--gold);" title="Open chart on DexScreener">' + esc(g.name || g.symbol || "name pending…") + "</a>" +
           (g.symbol ? '<span class="sym mono">' + esc(g.symbol) + "</span>" : "") +
-          caBtn +
+          (g.venue ? '<span class="mono tag" style="color:var(--teal);" title="Destination pool reported by PumpPortal: ' + esc(g.pool || "") + '">\u2192 ' + esc(g.venue) + "</span>" : "") +
+          (g.launchpad ? '<span class="mono tag" style="color:var(--textDim);">' + esc(g.launchpad) + "</span>" : "") +
+          caBtn + gExtra +
         "</div>" +
       "</div>";
     });
@@ -848,6 +1053,7 @@
   }
 
   function tick() {
+    updateCacheBanner();
     if (!autoRefreshEnabled || document.hidden) { statusText(); return; }
     secondsLeft -= 1;
     if (secondsLeft <= 0) {
@@ -975,14 +1181,16 @@
       var total = trades.length;
       var graduated = trades.filter(function (t) { return t.outcome === "graduated"; }).length;
       var closed = trades.filter(function (t) { return t.status === "closed"; });
-      var withFinalPnl = closed.filter(function (t) { return t.final_pnl_pct != null; });
-      var wins = withFinalPnl.filter(function (t) { return t.final_pnl_pct > 0; }).length;
+      // from entry when the worker recorded it; legacy rows only have the from-graduation number
+      var finalPnl = function (t) { return t.final_pnl_pct_from_entry != null ? t.final_pnl_pct_from_entry : t.final_pnl_pct; };
+      var withFinalPnl = closed.filter(function (t) { return t.outcome !== "rotated_out" && finalPnl(t) != null; });
+      var wins = withFinalPnl.filter(function (t) { return finalPnl(t) > 0; }).length;
 
       var statsHtml = '<div class="mono" style="font-size:0.78rem; color:var(--textDim); display:flex; gap:1.2rem; flex-wrap:wrap;">' +
         "<span>" + total + " tracked (last 30)</span>" +
         "<span>" + graduated + " graduated</span>" +
         "<span>" + withFinalPnl.length + " completed full cycle</span>" +
-        (withFinalPnl.length > 0 ? "<span style='color:var(--gold); font-weight:700;'>" + wins + "/" + withFinalPnl.length + " positive at 24h</span>" : "") +
+        (withFinalPnl.length > 0 ? "<span style='color:var(--gold); font-weight:700;'>" + wins + "/" + withFinalPnl.length + " positive at close</span>" : "") +
         (testCount > 0 ? "<span style='color:var(--rust);'>⚠ " + testCount + " test-mode row" + (testCount === 1 ? "" : "s") + " hidden — run the cleanup delete when ready</span>" : "") +
         "</div>";
       statsEl.innerHTML = statsHtml;
@@ -990,7 +1198,7 @@
       lastLoadedPaperTrades = trades;
 
       if (trades.length === 0) {
-        bodyEl.innerHTML = '<div class="dim-note">No paper trades yet — these accumulate as new launches come in and clear the wallet-freshness check.</div>';
+        bodyEl.innerHTML = '<div class="dim-note">No paper trades yet — these accumulate as launches, graduations and top signals come in.</div>';
       } else {
         var html = '<div style="display:grid; gap:0.35rem;">';
         trades.forEach(function (t, idx) {
@@ -999,21 +1207,41 @@
             outcomeBadge = '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">🎓 graduated</span>';
           } else if (t.outcome === "no_graduation_timeout") {
             outcomeBadge = '<span class="mono tag" style="color:var(--rust); border-color:var(--rust);">✗ never graduated</span>';
+          } else if (t.outcome === "completed") {
+            outcomeBadge = '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">✓ completed</span>';
+          } else if (t.outcome === "rotated_out") {
+            outcomeBadge = '<span class="mono tag" style="color:var(--textDim);" title="Closed early to stay under the open-trade cap">rotated out</span>';
           } else {
             outcomeBadge = '<span class="mono tag" style="color:var(--textDim);">watching…</span>';
           }
           var pnlBadge = "";
-          if (t.final_pnl_pct != null) {
-            var pos = t.final_pnl_pct >= 0;
-            pnlBadge = '<span class="mono" style="font-size:0.8rem; font-weight:700; color:' + (pos ? "var(--teal)" : "var(--rust)") + ';">' +
-              (pos ? "+" : "") + Number(t.final_pnl_pct).toFixed(1) + "% @24h</span>";
-          } else {
-            var lastCheckpoint = (t.snapshots || []).filter(function (s) { return s.type === "checkpoint"; }).slice(-1)[0];
-            if (lastCheckpoint) {
-              var lpos = lastCheckpoint.pnlPctFromGraduation >= 0;
-              pnlBadge = '<span class="mono" style="font-size:0.75rem; color:' + (lpos ? "var(--teal)" : "var(--rust)") + ';">' +
-                (lpos ? "+" : "") + Number(lastCheckpoint.pnlPctFromGraduation).toFixed(1) + "% @" + lastCheckpoint.atMinutes + "min</span>";
-            }
+          var fmtPct = function (v) { return (v >= 0 ? "+" : "") + Number(v).toFixed(1) + "%"; };
+          var pctSpan = function (v, label, strong) {
+            return '<span class="mono" style="font-size:' + (strong ? "0.8rem; font-weight:700" : "0.72rem") + "; color:" + (v >= 0 ? "var(--teal)" : "var(--rust)") + ';">' +
+              fmtPct(v) + " " + label + "</span>";
+          };
+          var isLaunch = !t.entry_kind || t.entry_kind === "launch";
+          var lastCheckpoint = (t.snapshots || []).filter(function (s) { return s.type === "checkpoint"; }).slice(-1)[0];
+          var fromEntry = t.final_pnl_pct_from_entry != null ? t.final_pnl_pct_from_entry
+            : (t.latest_pnl_pct_from_entry != null ? t.latest_pnl_pct_from_entry : (lastCheckpoint ? lastCheckpoint.pnlPctFromEntry : null));
+          var fromGrad = t.final_pnl_pct != null ? t.final_pnl_pct : (lastCheckpoint ? lastCheckpoint.pnlPctFromGraduation : null);
+          var when = t.status === "closed" ? "at close" : (lastCheckpoint ? "@" + lastCheckpoint.atMinutes + "min" : "");
+          if (fromEntry != null) pnlBadge += pctSpan(fromEntry, "from entry " + when, t.status === "closed");
+          if (isLaunch && fromGrad != null) pnlBadge += (pnlBadge ? " " : "") + pctSpan(fromGrad, "from grad" + (fromEntry == null ? " " + when : ""), t.status === "closed" && fromEntry == null);
+          else if (!isLaunch && fromEntry == null && fromGrad != null) pnlBadge = pctSpan(fromGrad, when, t.status === "closed");
+          var setupTag = "";
+          if (t.entry_kind) {
+            var setupTitle = [
+              "Entered: " + t.entry_kind + (t.entry_trigger ? " / " + t.entry_trigger : ""),
+              t.entry_sources && t.entry_sources.length ? "Sources: " + t.entry_sources.join(", ") : "",
+              t.entry_score != null ? "Score: " + t.entry_score : "",
+              t.entry_badges && t.entry_badges.rugTier ? "RugCheck: " + t.entry_badges.rugTier : "",
+              t.entry_badges && t.entry_badges.goodDevTier ? "Dev: " + t.entry_badges.goodDevTier : "",
+              t.entry_badges && t.entry_badges.badKinds && t.entry_badges.badKinds.length ? "Flags: " + t.entry_badges.badKinds.join(", ") : "",
+              t.baseline_delayed_min != null ? "Entry price filled " + t.baseline_delayed_min + "min late (first priced checkpoint)" : "",
+            ].filter(Boolean).join("\n");
+            setupTag = '<span class="mono tag" style="color:var(--gold); border-color:var(--gold);" title="' + esc(setupTitle) + '">' +
+              esc(t.entry_kind.replace("_", " ") + (t.entry_trigger ? " · " + t.entry_trigger.replace(/_/g, " ") : "")) + "</span>";
           }
           var walletTag = t.entry_features && t.entry_features.walletAgeLabel
             ? '<span class="mono tag" style="color:var(--textDim);">' + esc(t.entry_features.walletAgeLabel) + " wallet</span>"
@@ -1035,7 +1263,7 @@
               '<div class="row-left">' +
                 '<span class="name" style="font-size:0.85rem;">' + esc(t.name || t.symbol || "unknown") + "</span>" +
                 (t.symbol ? '<span class="sym mono">' + esc(t.symbol) + "</span>" : "") +
-                walletTag + precedentTag + outcomeBadge + cardBtn +
+                setupTag + walletTag + precedentTag + outcomeBadge + cardBtn +
               "</div>" +
               '<div class="row-right">' + pnlBadge + "</div>" +
             "</div>" +
@@ -1121,12 +1349,15 @@
     ctx.font = "500 32px 'IBM Plex Mono', monospace";
     var outcomeText = trade.outcome === "graduated" ? "GRADUATED"
       : trade.outcome === "no_graduation_timeout" ? "NEVER GRADUATED"
+      : trade.outcome === "completed" ? "COMPLETED"
+      : trade.outcome === "rotated_out" ? "ROTATED OUT"
       : "WATCHING\u2026";
     ctx.fillStyle = trade.outcome === "graduated" ? "#5FA88F" : trade.outcome === "no_graduation_timeout" ? "#B5533C" : "#8B8AA0";
     ctx.fillText(outcomeText, W - 80, 440);
 
     ctx.textAlign = "center";
-    var pnl = trade.final_pnl_pct;
+    var pnlFromEntry = trade.final_pnl_pct_from_entry != null;
+    var pnl = pnlFromEntry ? trade.final_pnl_pct_from_entry : trade.final_pnl_pct;
     var pnlColor = pnl == null ? "#8B8AA0" : (pnl >= 0 ? "#5FA88F" : "#B5533C");
     ctx.fillStyle = pnlColor;
     ctx.font = "700 130px 'Inter', sans-serif";
@@ -1134,7 +1365,7 @@
     ctx.fillText(pnlText, W / 2, 680);
     ctx.font = "400 24px 'IBM Plex Mono', monospace";
     ctx.fillStyle = "#8B8AA0";
-    ctx.fillText(pnl == null ? "no completed cycle yet" : "at 24h post-graduation", W / 2, 730);
+    ctx.fillText(pnl == null ? "no completed cycle yet" : (pnlFromEntry ? "from entry, at close" : "from graduation, at close"), W / 2, 730);
 
     var prec = trade.entry_features && trade.entry_features.precedent;
     if (prec) {
@@ -1277,7 +1508,7 @@
           } else {
             rcEl.innerHTML = '<div class="dim-note" style="margin-top:0;">RugCheck didn\'t return a report for this address.</div>';
           }
-        } catch (e) {
+        } catch {
           rcEl.innerHTML = '<div class="err" style="margin-top:0;">RugCheck lookup failed.</div>';
         }
       }
