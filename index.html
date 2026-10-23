@@ -232,9 +232,12 @@
         <div>
           <div class="panel-title">🧪 Paper Trading — Simulated, Zero Real Money</div>
           <div class="mono panel-sub">
-            Every qualifying launch gets a simulated buy logged automatically. Tracks whether it graduates
-            (survives to a real DEX pool — PumpSwap or Raydium) and, if so, real DexScreener price at 5min/30min/2hr/24hr
-            after graduation. Once 5+ comparable past trades exist (same wallet-age bucket, similar entry
+            Simulated buys logged automatically, each tagged with why it was entered: a sample of new launches
+            (every flagged creator, plus RugCheck-checked and random control launches), every graduation, and tokens
+            entering the board's top signals. Launches are tracked to graduation (a real DEX pool — PumpSwap or
+            Raydium); priced trades get real DexScreener checkpoints (most liquid pool) at 5min/30min/1h/2h/6h/24h.
+            Returns are shown from entry (launches: market cap at launch) and, for launches, from graduation.
+            Once 5+ comparable past trades exist (same wallet-age bucket, similar entry
             size), new trades also show a 🔍 precedent badge — a real historical win-rate lookup, not a
             guess. No badge yet means not enough data, not "no signal."
           </div>
@@ -1178,14 +1181,16 @@
       var total = trades.length;
       var graduated = trades.filter(function (t) { return t.outcome === "graduated"; }).length;
       var closed = trades.filter(function (t) { return t.status === "closed"; });
-      var withFinalPnl = closed.filter(function (t) { return t.final_pnl_pct != null; });
-      var wins = withFinalPnl.filter(function (t) { return t.final_pnl_pct > 0; }).length;
+      // from entry when the worker recorded it; legacy rows only have the from-graduation number
+      var finalPnl = function (t) { return t.final_pnl_pct_from_entry != null ? t.final_pnl_pct_from_entry : t.final_pnl_pct; };
+      var withFinalPnl = closed.filter(function (t) { return t.outcome !== "rotated_out" && finalPnl(t) != null; });
+      var wins = withFinalPnl.filter(function (t) { return finalPnl(t) > 0; }).length;
 
       var statsHtml = '<div class="mono" style="font-size:0.78rem; color:var(--textDim); display:flex; gap:1.2rem; flex-wrap:wrap;">' +
         "<span>" + total + " tracked (last 30)</span>" +
         "<span>" + graduated + " graduated</span>" +
         "<span>" + withFinalPnl.length + " completed full cycle</span>" +
-        (withFinalPnl.length > 0 ? "<span style='color:var(--gold); font-weight:700;'>" + wins + "/" + withFinalPnl.length + " positive at 24h</span>" : "") +
+        (withFinalPnl.length > 0 ? "<span style='color:var(--gold); font-weight:700;'>" + wins + "/" + withFinalPnl.length + " positive at close</span>" : "") +
         (testCount > 0 ? "<span style='color:var(--rust);'>⚠ " + testCount + " test-mode row" + (testCount === 1 ? "" : "s") + " hidden — run the cleanup delete when ready</span>" : "") +
         "</div>";
       statsEl.innerHTML = statsHtml;
@@ -1193,7 +1198,7 @@
       lastLoadedPaperTrades = trades;
 
       if (trades.length === 0) {
-        bodyEl.innerHTML = '<div class="dim-note">No paper trades yet — these accumulate as new launches come in and clear the wallet-freshness check.</div>';
+        bodyEl.innerHTML = '<div class="dim-note">No paper trades yet — these accumulate as launches, graduations and top signals come in.</div>';
       } else {
         var html = '<div style="display:grid; gap:0.35rem;">';
         trades.forEach(function (t, idx) {
@@ -1202,21 +1207,41 @@
             outcomeBadge = '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">🎓 graduated</span>';
           } else if (t.outcome === "no_graduation_timeout") {
             outcomeBadge = '<span class="mono tag" style="color:var(--rust); border-color:var(--rust);">✗ never graduated</span>';
+          } else if (t.outcome === "completed") {
+            outcomeBadge = '<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">✓ completed</span>';
+          } else if (t.outcome === "rotated_out") {
+            outcomeBadge = '<span class="mono tag" style="color:var(--textDim);" title="Closed early to stay under the open-trade cap">rotated out</span>';
           } else {
             outcomeBadge = '<span class="mono tag" style="color:var(--textDim);">watching…</span>';
           }
           var pnlBadge = "";
-          if (t.final_pnl_pct != null) {
-            var pos = t.final_pnl_pct >= 0;
-            pnlBadge = '<span class="mono" style="font-size:0.8rem; font-weight:700; color:' + (pos ? "var(--teal)" : "var(--rust)") + ';">' +
-              (pos ? "+" : "") + Number(t.final_pnl_pct).toFixed(1) + "% @24h</span>";
-          } else {
-            var lastCheckpoint = (t.snapshots || []).filter(function (s) { return s.type === "checkpoint"; }).slice(-1)[0];
-            if (lastCheckpoint) {
-              var lpos = lastCheckpoint.pnlPctFromGraduation >= 0;
-              pnlBadge = '<span class="mono" style="font-size:0.75rem; color:' + (lpos ? "var(--teal)" : "var(--rust)") + ';">' +
-                (lpos ? "+" : "") + Number(lastCheckpoint.pnlPctFromGraduation).toFixed(1) + "% @" + lastCheckpoint.atMinutes + "min</span>";
-            }
+          var fmtPct = function (v) { return (v >= 0 ? "+" : "") + Number(v).toFixed(1) + "%"; };
+          var pctSpan = function (v, label, strong) {
+            return '<span class="mono" style="font-size:' + (strong ? "0.8rem; font-weight:700" : "0.72rem") + "; color:" + (v >= 0 ? "var(--teal)" : "var(--rust)") + ';">' +
+              fmtPct(v) + " " + label + "</span>";
+          };
+          var isLaunch = !t.entry_kind || t.entry_kind === "launch";
+          var lastCheckpoint = (t.snapshots || []).filter(function (s) { return s.type === "checkpoint"; }).slice(-1)[0];
+          var fromEntry = t.final_pnl_pct_from_entry != null ? t.final_pnl_pct_from_entry
+            : (t.latest_pnl_pct_from_entry != null ? t.latest_pnl_pct_from_entry : (lastCheckpoint ? lastCheckpoint.pnlPctFromEntry : null));
+          var fromGrad = t.final_pnl_pct != null ? t.final_pnl_pct : (lastCheckpoint ? lastCheckpoint.pnlPctFromGraduation : null);
+          var when = t.status === "closed" ? "at close" : (lastCheckpoint ? "@" + lastCheckpoint.atMinutes + "min" : "");
+          if (fromEntry != null) pnlBadge += pctSpan(fromEntry, "from entry " + when, t.status === "closed");
+          if (isLaunch && fromGrad != null) pnlBadge += (pnlBadge ? " " : "") + pctSpan(fromGrad, "from grad" + (fromEntry == null ? " " + when : ""), t.status === "closed" && fromEntry == null);
+          else if (!isLaunch && fromEntry == null && fromGrad != null) pnlBadge = pctSpan(fromGrad, when, t.status === "closed");
+          var setupTag = "";
+          if (t.entry_kind) {
+            var setupTitle = [
+              "Entered: " + t.entry_kind + (t.entry_trigger ? " / " + t.entry_trigger : ""),
+              t.entry_sources && t.entry_sources.length ? "Sources: " + t.entry_sources.join(", ") : "",
+              t.entry_score != null ? "Score: " + t.entry_score : "",
+              t.entry_badges && t.entry_badges.rugTier ? "RugCheck: " + t.entry_badges.rugTier : "",
+              t.entry_badges && t.entry_badges.goodDevTier ? "Dev: " + t.entry_badges.goodDevTier : "",
+              t.entry_badges && t.entry_badges.badKinds && t.entry_badges.badKinds.length ? "Flags: " + t.entry_badges.badKinds.join(", ") : "",
+              t.baseline_delayed_min != null ? "Entry price filled " + t.baseline_delayed_min + "min late (first priced checkpoint)" : "",
+            ].filter(Boolean).join("\n");
+            setupTag = '<span class="mono tag" style="color:var(--gold); border-color:var(--gold);" title="' + esc(setupTitle) + '">' +
+              esc(t.entry_kind.replace("_", " ") + (t.entry_trigger ? " · " + t.entry_trigger.replace(/_/g, " ") : "")) + "</span>";
           }
           var walletTag = t.entry_features && t.entry_features.walletAgeLabel
             ? '<span class="mono tag" style="color:var(--textDim);">' + esc(t.entry_features.walletAgeLabel) + " wallet</span>"
@@ -1238,7 +1263,7 @@
               '<div class="row-left">' +
                 '<span class="name" style="font-size:0.85rem;">' + esc(t.name || t.symbol || "unknown") + "</span>" +
                 (t.symbol ? '<span class="sym mono">' + esc(t.symbol) + "</span>" : "") +
-                walletTag + precedentTag + outcomeBadge + cardBtn +
+                setupTag + walletTag + precedentTag + outcomeBadge + cardBtn +
               "</div>" +
               '<div class="row-right">' + pnlBadge + "</div>" +
             "</div>" +
@@ -1324,12 +1349,15 @@
     ctx.font = "500 32px 'IBM Plex Mono', monospace";
     var outcomeText = trade.outcome === "graduated" ? "GRADUATED"
       : trade.outcome === "no_graduation_timeout" ? "NEVER GRADUATED"
+      : trade.outcome === "completed" ? "COMPLETED"
+      : trade.outcome === "rotated_out" ? "ROTATED OUT"
       : "WATCHING\u2026";
     ctx.fillStyle = trade.outcome === "graduated" ? "#5FA88F" : trade.outcome === "no_graduation_timeout" ? "#B5533C" : "#8B8AA0";
     ctx.fillText(outcomeText, W - 80, 440);
 
     ctx.textAlign = "center";
-    var pnl = trade.final_pnl_pct;
+    var pnlFromEntry = trade.final_pnl_pct_from_entry != null;
+    var pnl = pnlFromEntry ? trade.final_pnl_pct_from_entry : trade.final_pnl_pct;
     var pnlColor = pnl == null ? "#8B8AA0" : (pnl >= 0 ? "#5FA88F" : "#B5533C");
     ctx.fillStyle = pnlColor;
     ctx.font = "700 130px 'Inter', sans-serif";
@@ -1337,7 +1365,7 @@
     ctx.fillText(pnlText, W / 2, 680);
     ctx.font = "400 24px 'IBM Plex Mono', monospace";
     ctx.fillStyle = "#8B8AA0";
-    ctx.fillText(pnl == null ? "no completed cycle yet" : "at 24h post-graduation", W / 2, 730);
+    ctx.fillText(pnl == null ? "no completed cycle yet" : (pnlFromEntry ? "from entry, at close" : "from graduation, at close"), W / 2, 730);
 
     var prec = trade.entry_features && trade.entry_features.precedent;
     if (prec) {
