@@ -698,7 +698,9 @@
     var metas = payload.activeMetas || [];
     metas.forEach(function (m) {
       html += '<span class="mono tag" style="color:var(--gold); border-color:var(--gold); padding:0.3rem 0.6rem; font-size:0.75rem;" title="' +
-        esc("Recent launches: " + m.examples.join(", ")) + '">\uD83D\uDD25 META: "' + esc(m.keyword) + '" \u00d7' + m.count + "</span>";
+        esc("Recent launches: " + m.examples.join(", ") +
+          (m.distinctCreators != null ? " \u2014 " + m.distinctCreators + " distinct creator wallets, " + m.distinctTokens + " distinct tokens" : "")) +
+        '">\uD83D\uDD25 META: "' + esc(m.keyword) + '" \u00d7' + (m.distinctCreators != null ? m.distinctCreators : m.count) + "</span>";
     });
 
     if (!regime && metas.length === 0) {
@@ -809,7 +811,7 @@
       }
       var badActorBadge = "";
       if (l.isBadActor) {
-        badActorBadge = '<span class="mono tag" style="color:var(--rust); border-color:var(--rust); font-weight:700; background:rgba(181,83,60,0.15);" title="Wallet matched against a community blocklist of wallets sold as \u0027aged\u0027 accounts \u2014 a known tactic to make coordinated launches look organic. A match is a warning signal, not proof.">\uD83D\uDEA8 KNOWN BAD ACTOR WALLET</span>';
+        badActorBadge = '<span class="mono tag" style="color:var(--rust); border-color:var(--rust); font-weight:700; background:rgba(181,83,60,0.15);" title="Creator wallet is on the worker\u0027s bad-actor list (data/bad-actors.json, plus an optional remote list). A match is a warning signal, not proof.">\uD83D\uDEA8 KNOWN BAD ACTOR WALLET</span>';
         rowStyleOverride = ' border-color:var(--rust); border-width:2px;'; // overrides gold if somehow both — danger takes visual priority
       }
       var xBadge = "";
