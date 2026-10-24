@@ -267,6 +267,7 @@
         </div>
         <div style="display:flex; flex-direction:column; gap:0.35rem; align-items:flex-end; flex-shrink:0;">
           <div class="chain-toggle mono" data-chain-toggle></div>
+          <div class="chain-toggle mono" data-arm-toggle title="Robinhood arms: Pons bonding-curve EARLY SIGNAL vs V4 DIRECT (momentum on fresh direct Uniswap v4 launches, any opening market cap)"></div>
           <span class="mono" id="early-meta" style="font-size:0.62rem; color:var(--textDim);"></span>
         </div>
       </div>
@@ -953,7 +954,40 @@
     top10_concentrated: "top-10 heavy", dev_heavy: "dev heavy", whale_buyer: "whale buyer", too_old: "too old", no_sol_usd: "no SOL price", graduated: "graduated", small_curve: "small custom curve", brand_name: "brand name", creator_sanctioned: "creator sanctioned", creator_confirmed: "rug dev", creator_suspected: "suspected rug dev", rugcheck_rugged: "rugged", dev_sold: "dev sold", score_below_min: "score < min",
     hard_negative: "hard negative", first10_selling: "first-10 selling", cohort_selldown: "cohort dumping",
     shared_funder: "shared funder", joined_late: "joined late", nonstandard_curve: "non-standard curve", stale: "no recent trades",
+    // v4_direct arm (Robinhood direct Uniswap v4 launches)
+    not_fresh: "not a fresh token", hooked_pool: "hooked pool", no_price: "no price", mcap_above_max: "above max mcap", no_move: "no move since open",
+    no_acceleration: "no acceleration", off_peak: "off its peak", thin_pool: "thin pool", small_lp: "small LP", liquidity_pulled: "LP pulled", copycat_ticker: "copycat ticker", rug_template: "rug-farm template",
+    safety_pending: "safety pending", honeypot: "honeypot", high_sell_tax: "high sell tax", cannot_sell_all: "can't sell all", mintable: "mintable",
+    blacklist: "blacklist", pausable: "pausable", hidden_owner: "hidden owner", rugged: "rugged",
   };
+  // ---------- arm filter (Robinhood): all / Pons curve / V4 DIRECT ----------
+  var ARM_LABEL = { all: "All arms", pons: "Pons", v4_direct: "V4 direct" };
+  var earlyArm = (function () { try { return localStorage.getItem("auspex.earlyArm") || "all"; } catch (e) { return "all"; } })();
+  // Solana cards have no arm: they show under "All arms" only
+  function armMatch(c) {
+    if (earlyArm === "all") return true;
+    if ((c.chain || "solana") !== "robinhood") return false;
+    return earlyArm === "v4_direct" ? c.arm === "v4_direct" : c.arm !== "v4_direct";
+  }
+  function renderArmToggles() {
+    document.querySelectorAll("[data-arm-toggle]").forEach(function (el) {
+      el.style.display = earlyChain === "solana" ? "none" : "";
+      el.innerHTML = ["all", "pons", "v4_direct"].map(function (k) {
+        return '<button type="button" data-arm="' + k + '" class="' + (earlyArm === k ? "on" : "") + '">' + ARM_LABEL[k] + "</button>";
+      }).join("");
+      el.querySelectorAll("button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          earlyArm = b.getAttribute("data-arm");
+          try { localStorage.setItem("auspex.earlyArm", earlyArm); } catch (e) {}
+          renderArmToggles();
+          if (lastEarlyPayload) {
+            renderEarlyScanner(lastEarlyPayload.earlyScanner || null, lastEarlyPayload.earlyConfig || null);
+            renderEarlyPaper(lastEarlyPayload.earlyPaper || null);
+          }
+        });
+      });
+    });
+  }
   // ---------- chain toggle (Solana / Robinhood / both), shared by the scanner and the paper panels ----------
   var CHAIN_LABEL = { solana: "Solana", robinhood: "Robinhood", all: "Both" };
   var earlyChain = (function () { try { return localStorage.getItem("auspex.earlyChain") || "all"; } catch (e) { return "all"; } })();
@@ -963,7 +997,7 @@
       ? '<span class="chain-badge rh" title="Robinhood Chain (Arbitrum Orbit L2, chain id 4663), ETH-quoted">RH</span>'
       : '<span class="chain-badge sol" title="Solana">SOL</span>';
   }
-  function chainMatch(c) { return earlyChain === "all" || (c.chain || "solana") === earlyChain; }
+  function chainMatch(c) { return (earlyChain === "all" || (c.chain || "solana") === earlyChain) && (earlyChain === "solana" || armMatch(c)); }
   function renderChainToggles() {
     document.querySelectorAll("[data-chain-toggle]").forEach(function (el) {
       el.innerHTML = ["solana", "robinhood", "all"].map(function (k) {
@@ -974,6 +1008,7 @@
           earlyChain = b.getAttribute("data-chain");
           try { localStorage.setItem("auspex.earlyChain", earlyChain); } catch (e) {}
           renderChainToggles();
+          renderArmToggles();
           if (lastEarlyPayload) {
             renderEarlyScanner(lastEarlyPayload.earlyScanner || null, lastEarlyPayload.earlyConfig || null);
             renderEarlyPaper(lastEarlyPayload.earlyPaper || null);
@@ -995,7 +1030,8 @@
     var q = c.quoteSymbol || (c.chain === "robinhood" ? "ETH" : "SOL");
     var rh = c.chain === "robinhood";
     var bad = (c.hardNegatives || []).length > 0;
-    var sig = c.signals && (c.signals.early_curve || c.signals.final_stretch);
+    var v4d = c.arm === "v4_direct";
+    var sig = c.signals && (c.signals.early_curve || c.signals.final_stretch || c.signals.v4_direct);
     var sc = c.earlyScore;
     var scCls = sc == null ? "" : sc >= 60 ? "hi" : sc < 30 ? "lo" : "";
     var prog = c.progress != null ? Math.round(c.progress * 100) : null;
@@ -1010,6 +1046,7 @@
     if (c.smartBuyers > 0) badges.push('<span class="mono tag" style="color:var(--teal); border-color:var(--teal);" title="Wallets with 2+ past early entries into $100k+ coins (confirmation only)">\uD83E\uDDE0 SMART \u00d7' + c.smartBuyers + "</span>");
     if (c.convictionBuys > 0) badges.push('<span class="mono tag" style="color:var(--gold); border-color:var(--gold);" title="Single buy \u2265 ' + (rh ? "0.35 ETH" : "4.5 SOL") + ' before ~$8k mcap">\uD83D\uDCAA CONVICTION ' + fmtN(c.largestConvictionSol, rh ? 2 : 1) + " " + q + "</span>");
     else if (c.convictionSoftBuys > 0) badges.push('<span class="mono tag" title="Single buy \u2265 ' + (rh ? "0.22 ETH" : "2.8 SOL") + ' before ~$8k mcap">\uD83D\uDCAA soft ' + fmtN(c.largestConvictionSol, rh ? 2 : 1) + " " + q + "</span>");
+    if (v4d) badges.push('<span class="mono tag" style="color:var(--teal); border-color:var(--teal);" title="V4 DIRECT arm: fresh token deployed ' + (c.deploySec != null ? fmtSec(c.deploySec) : "?") + ' before its own Uniswap v4 pool; fires on momentum in the first minutes at any opening market cap">\u26A1 V4 DIRECT' + (c.signals && c.signals.v4_direct ? " \u2713" : "") + "</span>");
     if (rh && c.venue) badges.push('<span class="mono tag" title="Launch venue on Robinhood Chain">' + esc(c.venue === "pons-v2" ? "Pons" : c.venue === "doppler" ? "Doppler" : "Uni v4") + "</span>");
     if (c.safety) {
       var sv = c.safety.verdict;
@@ -1057,8 +1094,21 @@
           : '<span title="First ~20 buyers: fresh / dormant (10d+) / KYC (exchange-funded)" style="grid-column: span 2;">fund ' + fund + "</span>") +
         '<span title="Deployer wallet age \u00b7 CEX-funded \u00b7 % of prior launches drained">dep ' + dep + "</span>" +
       "</div>" +
+      (v4d
+        ? '<div class="egrid mono" title="V4 DIRECT momentum: price vs the first swap, 1-minute acceleration, in-range pool depth, share of supply put in the pool, liquidity removed since">' +
+            "<span>open " + v(fmtK(c.openMcapUsd)) + "</span>" +
+            "<span>since " + v((c.mcapChangePct == null ? "\u00b7" : (c.mcapChangePct > 0 ? "+" : "") + fmtN(c.mcapChangePct, 0) + "%"), c.mcapChangePct > 0 ? "pos" : c.mcapChangePct < 0 ? "neg" : "") + "</span>" +
+            "<span>1m " + v(c.accel1m == null ? "\u00b7" : fmtN(c.accel1m, 2) + "\u00d7", c.accel1m > 1.05 ? "pos" : c.accel1m < 0.95 ? "neg" : "") + "</span>" +
+            "<span>liq " + v(fmtK(c.liquidityUsd)) + "</span>" +
+            "<span>LP " + v(c.lpSupplyPct == null ? "?" : fmtN(c.lpSupplyPct, 0) + "%") + "</span>" +
+            "<span>pulled " + v(fmtN(c.lpRemovedPct || 0, 0) + "%", c.lpRemovedPct >= 20 ? "neg" : "") + "</span>" +
+            "<span title=\"Earlier launches from the same setup (deploy factory, pool target, fee tier) that pulled their LP\">tmpl rug " + v(c.templateRugPct == null ? "\u00b7" : fmtN(c.templateRugPct, 0) + "% of " + c.templateN, c.templateRugPct >= 50 ? "neg" : "") + "</span>" +
+            (c.copycatN > 0 ? "<span title=\"Earlier fresh launches with the same ticker\">copy " + v("\u00d7" + c.copycatN, "neg") + "</span>" : "") +
+          "</div>"
+        : "") +
       (badges.length ? '<div class="ebadges">' + badges.join("") + "</div>" : "") +
-      (!sig && c.blockers && c.blockers.length ? '<div class="ebl mono">\u21B3 ' + c.blockers.slice(0, 4).map(function (b) { return esc(EARLY_BLOCKER_LABEL[b] || b); }).join(" \u00b7 ") + "</div>" : "") +
+      (!sig && v4d && c.v4Blockers && c.v4Blockers.length ? '<div class="ebl mono" title="Why V4 DIRECT has not fired">\u21B3 v4: ' + c.v4Blockers.slice(0, 4).map(function (b) { return esc(EARLY_BLOCKER_LABEL[b] || b); }).join(" \u00b7 ") + "</div>" : "") +
+      (!sig && !v4d && c.blockers && c.blockers.length ? '<div class="ebl mono">\u21B3 ' + c.blockers.slice(0, 4).map(function (b) { return esc(EARLY_BLOCKER_LABEL[b] || b); }).join(" \u00b7 ") + "</div>" : "") +
       '<div class="ebl mono"><button class="ca-btn" data-ca="' + esc(c.mint) + '" style="font-size:0.56rem;">' + esc(c.mint.slice(0, 4) + "\u2026" + c.mint.slice(-4)) + "</button> " +
         earlyLinksHTML(c) + "</div>" +
       "</div>";
@@ -1072,6 +1122,7 @@
       return;
     }
     renderChainToggles();
+    renderArmToggles();
     var cols = [["new", "NEW"], ["early_signal", "EARLY SIGNAL"], ["final_stretch", "FINAL STRETCH"], ["graduated", "GRADUATED"]];
     var chains = board.chains || ["solana"];
     var chainOff = earlyChain !== "all" && chains.indexOf(earlyChain) < 0;
@@ -1093,10 +1144,12 @@
     var st = sub.stats || {};
     var qu = board.quoteUsd || { solana: board.solUsd };
     document.getElementById("early-meta").textContent = "tracking " + (sub.tracked || 0) + " \u00b7 signals " + ((st.signals || {}).early_curve || 0) + " early / " + ((st.signals || {}).final_stretch || 0) + " stretch" +
+      ((st.signals || {}).v4_direct != null ? " / " + st.signals.v4_direct + " v4 direct (" + ((st.signals || {}).v4_control || 0) + " random controls)" : "") +
       (qu.solana ? " \u00b7 SOL $" + Number(qu.solana).toFixed(2) : "") + (qu.robinhood ? " \u00b7 ETH $" + Math.round(qu.robinhood) : "");
     document.getElementById("early-timestamp").textContent = "Scanner snapshot " + new Date(board.generatedAt).toLocaleTimeString() +
       (cfg && earlyChain !== "robinhood" ? " \u00b7 Solana window " + fmtK(cfg.minMcapUsd) + "\u2013" + fmtK(cfg.maxMcapUsd) + ", min age " + cfg.minAgeSec + "s, min score " + cfg.minScore + ", max bundle " + cfg.maxBundlePct + "%" : "") +
-      (cfg && cfg.robinhood && earlyChain !== "solana" ? " \u00b7 Robinhood window " + fmtK(cfg.robinhood.minMcapUsd) + "\u2013" + fmtK(cfg.robinhood.maxMcapUsd) + ", \u2265" + cfg.robinhood.minBuyersPerMin + " buyers/min, \u2265" + cfg.robinhood.minNetSolPerMin + " ETH/min net, feed " + (cfg.robinhood.ws ? "WS + " : "") + "eth_getLogs polling" : "") + ".";
+      (cfg && cfg.robinhood && earlyChain !== "solana" ? " \u00b7 Robinhood window " + fmtK(cfg.robinhood.minMcapUsd) + "\u2013" + fmtK(cfg.robinhood.maxMcapUsd) + ", \u2265" + cfg.robinhood.minBuyersPerMin + " buyers/min, \u2265" + cfg.robinhood.minNetSolPerMin + " ETH/min net, feed " + (cfg.robinhood.ws ? "WS + " : "") + "eth_getLogs polling" : "") +
+      (cfg && cfg.robinhood && cfg.robinhood.v4Direct && earlyChain !== "solana" ? " \u00b7 V4 DIRECT: any mcap, age " + cfg.robinhood.v4Direct.minAgeSec + "\u2013" + cfg.robinhood.v4Direct.maxAgeSec + "s, \u2265" + cfg.robinhood.v4Direct.minUniqueBuyers + " buyers, \u2265" + cfg.robinhood.v4Direct.minBuyersPerMin + "/min, \u2265" + cfg.robinhood.v4Direct.minNetEthPerMin + " ETH/min net, \u2265+" + cfg.robinhood.v4Direct.minMcapChangePct + "% since open, liq \u2265" + fmtK(cfg.robinhood.v4Direct.minLiquidityUsd) : "") + ".";
   }
 
   // ---------- Early-curve paper ----------
@@ -1133,19 +1186,24 @@
     var statsEl = document.getElementById("early-paper-stats");
     if (!statsEl) return;
     renderChainToggles();
+    renderArmToggles();
     var byChain = (ep && ep.byChain) || (ep ? { solana: { early_curve: ep.early_curve, final_stretch: ep.final_stretch } } : {});
     var showChains = earlyChain === "all" ? Object.keys(byChain) : [earlyChain];
     statsEl.innerHTML = ep ? showChains.map(function (ch) {
         var b = byChain[ch];
         if (!b) return '<div class="empty mono" style="margin-top:0.6rem;">No ' + CHAIN_LABEL[ch] + " paper stats (chain not enabled on the worker).</div>";
         var q = ch === "robinhood" ? "ETH" : "SOL";
-        return earlyStatsHTML(chainBadgeHTML(ch) + " EARLY SIGNAL entries (early_curve)", b.early_curve, q) + earlyStatsHTML(chainBadgeHTML(ch) + " FINAL STRETCH entries", b.final_stretch, q);
+        var pons = earlyArm !== "v4_direct" || ch !== "robinhood";
+        var v4 = ch === "robinhood" && earlyArm !== "pons" && b.v4_direct;
+        return (pons ? earlyStatsHTML(chainBadgeHTML(ch) + " EARLY SIGNAL entries (early_curve)", b.early_curve, q) + earlyStatsHTML(chainBadgeHTML(ch) + " FINAL STRETCH entries", b.final_stretch, q) : "") +
+          (v4 ? earlyStatsHTML(chainBadgeHTML(ch) + " \u26A1 V4 DIRECT entries (v4_direct)", b.v4_direct, q) + earlyStatsHTML(chainBadgeHTML(ch) + " V4 random control (same launches, random age, same exits)", b.v4_control, q) : "");
       }).join("") +
       (ep.exitPlan && ep.exitPlan.early_curve ? '<div class="mono" style="font-size:0.6rem; color:var(--textDim); margin-top:0.5rem;">Exit plan: ' + esc((ep.exitPlan.early_curve.ladder || []).join(", ")) + ", trail " + ep.exitPlan.early_curve.trailPct + "%, hard stop " + ep.exitPlan.early_curve.hardStopPct + "%, time stop " + ep.exitPlan.early_curve.timeStopMin + "m. Last " + (ep.windowDays || 7) + " days.</div>" : "")
       : '<div class="empty mono">No early-curve paper stats yet.</div>';
     var bodyEl = document.getElementById("early-paper-body");
     try {
-      var res = await fetch(SUPABASE_URL + "/rest/v1/auspex_paper_trades?entry_kind=in.(early_curve,final_stretch)&order=entry_time.desc&limit=25" +
+      var kinds = earlyChain === "solana" || earlyArm === "pons" ? "early_curve,final_stretch" : earlyArm === "v4_direct" ? "v4_direct,v4_control" : "early_curve,final_stretch,v4_direct,v4_control";
+      var res = await fetch(SUPABASE_URL + "/rest/v1/auspex_paper_trades?entry_kind=in.(" + kinds + ")&order=entry_time.desc&limit=25" +
         (earlyChain !== "all" ? "&chain_id=eq." + encodeURIComponent(earlyChain) : "") +
         "&select=chain_id,mint,symbol,entry_kind,entry_time,status,outcome,entry_mcap_usd,eff_entry_mcap_usd,peak_mcap_usd,peak_multiple,realized_multiple,final_pnl_pct,exit_reason,time_to_peak_sec,hold_sec,sustained_100k,excluded_from_stats",
         { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY } });
@@ -1157,7 +1215,7 @@
         rows.map(function (r) {
           var pnl = r.final_pnl_pct != null ? Number(r.final_pnl_pct) : null;
           var open = r.status === "open";
-          return "<tr" + (r.excluded_from_stats ? ' class="small" title="Excluded from stats"' : "") + "><td>" + chainBadgeHTML(r.chain_id) + " " + esc(r.symbol || r.mint.slice(0, 6)) + "</td><td>" + (r.entry_kind === "early_curve" ? "early" : "stretch") + "</td>" +
+          return "<tr" + (r.excluded_from_stats ? ' class="small" title="Excluded from stats"' : "") + "><td>" + chainBadgeHTML(r.chain_id) + " " + esc(r.symbol || r.mint.slice(0, 6)) + "</td><td>" + ({ early_curve: "early", final_stretch: "stretch", v4_direct: "v4 direct", v4_control: "v4 control" }[r.entry_kind] || esc(r.entry_kind)) + "</td>" +
             "<td>" + fmtK(r.eff_entry_mcap_usd || r.entry_mcap_usd) + "</td><td>" + fmtK(r.peak_mcap_usd) + (r.peak_multiple ? ' <span class="sub">' + Number(r.peak_multiple).toFixed(1) + "\u00d7</span>" : "") + (r.sustained_100k ? " \u2705" : "") + "</td>" +
             "<td>" + (r.realized_multiple != null ? Number(r.realized_multiple).toFixed(2) + "\u00d7" : open ? "open" : r.outcome === "unfilled" ? "unfilled" : "\u00b7") + "</td>" +
             '<td class="' + (pnl == null ? "" : pnl >= 0 ? "pos" : "neg") + '">' + (pnl == null ? "\u00b7" : (pnl >= 0 ? "+" : "") + pnl.toFixed(0) + "%") + "</td>" +

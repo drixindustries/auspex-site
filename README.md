@@ -22,6 +22,13 @@ It is a single `index.html` with no build step. It reads a shared cache from Sup
 the launch venue (Pons / Uni v4 / Doppler) and the EVM safety verdict, and link to Blockscout, GeckoTerminal and DexScreener. Base is
 no longer shown anywhere.
 
+**Arm toggle (Robinhood).** Next to the chain toggle, **All arms / Pons / V4 direct** (remembered in `localStorage`
+`auspex.earlyArm`) filters Robinhood cards: Pons bonding-curve launches, or fresh direct Uniswap v4 launches. V4 DIRECT cards
+carry a teal ⚡ V4 DIRECT badge (✓ once the v4_direct signal fired) and a row with the open mcap, move since the first swap,
+1-minute acceleration, in-range pool depth, share of supply put in the pool, LP pulled since, the launch setup's rug rate
+(earlier launches from the same deploy factory / pool target / fee tier that pulled their LP) and copycat tickers. The
+early-paper panel shows v4_direct next to its random control (same launches, random entry age, same exits).
+
 A sticky banner warns when the cache is more than 5 minutes old or can't be read.
 
 ## Creator badges
