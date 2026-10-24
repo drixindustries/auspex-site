@@ -1,6 +1,6 @@
 # auspex-site
 
-The static front end for **Auspex**, a live signal feed for finding Solana and Base tokens early. Live at **https://auspex-site.vercel.app**.
+The static front end for **Auspex**, a live signal feed for finding Solana and Robinhood Chain tokens early. Live at **https://auspex-site.vercel.app**.
 
 It is a single `index.html` with no build step. It reads a shared cache from Supabase using the public anon key. The cache is filled every 90s by the background worker, [drixindustries/auspex-worker](https://github.com/drixindustries/auspex-worker).
 
@@ -10,10 +10,17 @@ It is a single `index.html` with no build step. It reads a shared cache from Sup
 |---|---|
 | Signal Feed, Raw feeds, Just Launched, Just Graduated, hot themes, SOL regime | `auspex_signal_cache` row `latest` (written by the worker) |
 | Signal Performance, "since signal" chips | `auspex_signal_cache` row `latest`: `signalPerformance` (aggregates) and `signalPerf` on each tracked row. Both are computed by the worker from `auspex_signal_outcomes`. |
+| Early Scanner (New / Early Signal / Final Stretch / Graduated) | `auspex_signal_cache` row `latest`: `earlyScanner` (cards carry `chain`; `byChain` holds each chain's board) |
+| Early-curve paper trades | `earlyPaper.byChain` stats + `auspex_paper_trades` (`entry_kind` early_curve / final_stretch, filtered by `chain_id`) |
 | Paper Trading | `auspex_paper_trades` |
 | Hall of Fame | `auspex_hall_of_fame` |
-| CA scanner | DexScreener `tokens/v1` and RugCheck report, called from the browser |
+| CA scanner | DexScreener `tokens/v1` (Solana or Robinhood Chain by address format), GeckoTerminal for Robinhood bonding-curve tokens, RugCheck (Solana) and GoPlus `token_security/4663` (Robinhood Chain), called from the browser |
 | Connect a feed | any JSON URL that allows browser access (CORS) |
+
+**Chain toggle.** The Early Scanner and the early-curve paper panel share a **Solana / Robinhood / Both** toggle (remembered in
+`localStorage`). Robinhood Chain cards carry a lime **RH** badge, quote ETH instead of SOL (net ETH/min, 0.05 ETH paper size), show
+the launch venue (Pons / Uni v4 / Doppler) and the EVM safety verdict, and link to Blockscout, GeckoTerminal and DexScreener. Base is
+no longer shown anywhere.
 
 A sticky banner warns when the cache is more than 5 minutes old or can't be read.
 
@@ -23,7 +30,7 @@ These badges come from the worker's payload. Hover any badge to see the matching
 
 | Badge | Style | Meaning |
 |---|---|---|
-| ⛔ SANCTIONED | solid red | Creator is on the OFAC SDN list (Solana, or ETH/Base). |
+| ⛔ SANCTIONED | solid red | Creator is on the OFAC SDN list (Solana, or ETH / EVM addresses on Robinhood Chain). |
 | 🚨 RUG DEV · CONFIRMED | red fill | Auspex's own list: one of the wallet's tokens was rugged (per RugCheck), or 2 or more of its graduations collapsed. |
 | ⚠️ SUSPECTED RUG DEV | red outline | Auspex's own list: one graduation collapsed. |
 | ⚠️ HEURISTIC LIST · UNVERIFIED | dashed amber | Third-party automated list (AllenHark). Unverified, with known false positives. |
