@@ -133,6 +133,14 @@
   .ebadges { margin-top: 0.3rem; display: flex; flex-wrap: wrap; gap: 0.2rem; }
   .ebadges .tag { font-size: 0.56rem; padding: 0.05rem 0.3rem; }
   .ebl { margin-top: 0.25rem; color: var(--textDim); font-size: 0.58rem; }
+  /* chain toggle (Solana / Robinhood / both) + chain badges */
+  .chain-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .chain-toggle button { background: transparent; color: var(--textDim); border: none; border-right: 1px solid var(--line); padding: 0.2rem 0.55rem; font-size: 0.62rem; cursor: pointer; font-family: inherit; }
+  .chain-toggle button:last-child { border-right: none; }
+  .chain-toggle button.on { background: var(--gold); color: #111; font-weight: 700; }
+  .chain-badge { font-size: 0.54rem; border-radius: 4px; padding: 0.02rem 0.28rem; font-weight: 700; letter-spacing: 0.03em; border: 1px solid; }
+  .chain-badge.sol { color: #b58cff; border-color: #b58cff; }
+  .chain-badge.rh { color: #c8ff00; border-color: #c8ff00; background: rgba(200,255,0,0.08); }
   .atg { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
   .atg span { border: 1px dashed var(--gold); border-radius: 5px; padding: 0.15rem 0.45rem; font-size: 0.64rem; }
   .estats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.2rem, 1fr)); gap: 0.5rem; margin-top: 0.8rem; }
@@ -193,8 +201,9 @@
     <div class="panel">
       <div class="panel-title">🔍 Scan a Contract Address</div>
       <div class="mono panel-sub">
-        Paste any Solana or Base CA for an on-demand check — auto-detects chain, pulls DexScreener
-        price/liquidity and (Solana only) a RugCheck safety pass. KOL and LunarCrush checks aren't
+        Paste any Solana or Robinhood Chain CA for an on-demand check — auto-detects chain, pulls DexScreener
+        price/liquidity (GeckoTerminal for Robinhood bonding-curve tokens DexScreener doesn't index yet), a RugCheck
+        safety pass on Solana and a GoPlus token-security pass on Robinhood Chain. KOL and LunarCrush checks aren't
         included here — those use rate-limited keys held server-side, not available for on-demand lookups.
       </div>
       <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
@@ -218,7 +227,7 @@
           <div class="panel-title lg">⚡ Signal Feed — by Chain, by CA</div>
           <div class="mono panel-sub">
             DexScreener (top boosts, latest boosts, latest profiles) + CoinGecko trending + GeckoTerminal
-            (trending and brand-new pools, Solana &amp; Base), grouped by chain then by exact contract address.
+            (trending and brand-new pools, Solana &amp; Robinhood Chain), grouped by chain then by exact contract address.
             A "confirmed" badge means the same CA showed up from more than one provider — a real match, not a
             ticker guess. The score rewards healthy upward momentum, liquidity and freshness, and penalizes
             dumps and thin pools (under $5k liquidity). CoinGecko coins without a resolvable on-chain address
@@ -245,8 +254,9 @@
         <div>
           <div class="panel-title lg">🛰 Early Scanner — Bonding-Curve Pulse</div>
           <div class="mono panel-sub">
-            Every new pump.fun (and, with a PumpPortal key, LetsBonk) launch is followed trade by trade for its first
-            ~15 minutes. <b>New</b> = just launched; <b>Early Signal</b> = fired in the $4k–$15k window with real
+            Every new pump.fun (and, with a PumpPortal key, LetsBonk) launch on Solana and every Pons V2 bonding-curve
+            and Uniswap v4 pool launch on <b>Robinhood Chain</b> (ETH-quoted; Pons starts near $4k and completes near
+            $49k into a locked v4 pool) is followed trade by trade for its first ~15 minutes. <b>New</b> = just launched; <b>Early Signal</b> = fired in the $4k–$15k window with real
             demand (fast unique buyers, net SOL inflow, buyers ≫ sellers, low bundle/sniper share, dev not
             selling, first-10 buyers still holding); <b>Final Stretch</b> = 60–85% of the curve and still
             accelerating; <b>Graduated</b> = migrated (kept as an outcome control — no entries at the graduation
@@ -255,7 +265,10 @@
             and may lag. Hover a card for its score breakdown and blockers. Signals are hints, not advice.
           </div>
         </div>
-        <span class="mono" id="early-meta" style="font-size:0.62rem; color:var(--textDim);"></span>
+        <div style="display:flex; flex-direction:column; gap:0.35rem; align-items:flex-end; flex-shrink:0;">
+          <div class="chain-toggle mono" data-chain-toggle></div>
+          <span class="mono" id="early-meta" style="font-size:0.62rem; color:var(--textDim);"></span>
+        </div>
       </div>
       <div id="early-atg"></div>
       <div class="pulse" id="early-body"></div>
@@ -276,9 +289,12 @@
             into the bond, a 35% trailing stop after the first take-profit, a 40% hard stop, an 8-minute time stop,
             and instant exits on a dev sell or a launch-cohort / first-10 sell-down. <b>Win</b> = closed with
             profit after costs. <b>Sustained $100k</b> = held ≥$100k for 180s while a 0.5 SOL sell cost ≤15%.
+            Robinhood Chain entries use 0.05 ETH and the same ladder, with the fee actually charged on the last
+            trade (Pons anti-snipe tax included) instead of a flat 1%, and pool-depth impact on v4 launches.
             Small samples are noise; past results, not predictions.
           </div>
         </div>
+        <div class="chain-toggle mono" data-chain-toggle style="flex-shrink:0;"></div>
       </div>
       <div id="early-paper-stats"></div>
       <div id="early-paper-body" style="margin-top:0.6rem;"></div>
@@ -938,7 +954,46 @@
     hard_negative: "hard negative", first10_selling: "first-10 selling", cohort_selldown: "cohort dumping",
     shared_funder: "shared funder", joined_late: "joined late", nonstandard_curve: "non-standard curve", stale: "no recent trades",
   };
+  // ---------- chain toggle (Solana / Robinhood / both), shared by the scanner and the paper panels ----------
+  var CHAIN_LABEL = { solana: "Solana", robinhood: "Robinhood", all: "Both" };
+  var earlyChain = (function () { try { return localStorage.getItem("auspex.earlyChain") || "all"; } catch (e) { return "all"; } })();
+  var lastEarlyPayload = null;
+  function chainBadgeHTML(chain) {
+    return chain === "robinhood"
+      ? '<span class="chain-badge rh" title="Robinhood Chain (Arbitrum Orbit L2, chain id 4663), ETH-quoted">RH</span>'
+      : '<span class="chain-badge sol" title="Solana">SOL</span>';
+  }
+  function chainMatch(c) { return earlyChain === "all" || (c.chain || "solana") === earlyChain; }
+  function renderChainToggles() {
+    document.querySelectorAll("[data-chain-toggle]").forEach(function (el) {
+      el.innerHTML = ["solana", "robinhood", "all"].map(function (k) {
+        return '<button type="button" data-chain="' + k + '" class="' + (earlyChain === k ? "on" : "") + '">' + CHAIN_LABEL[k] + "</button>";
+      }).join("");
+      el.querySelectorAll("button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          earlyChain = b.getAttribute("data-chain");
+          try { localStorage.setItem("auspex.earlyChain", earlyChain); } catch (e) {}
+          renderChainToggles();
+          if (lastEarlyPayload) {
+            renderEarlyScanner(lastEarlyPayload.earlyScanner || null, lastEarlyPayload.earlyConfig || null);
+            renderEarlyPaper(lastEarlyPayload.earlyPaper || null);
+          }
+        });
+      });
+    });
+  }
+  function earlyLinksHTML(c) {
+    if (c.chain === "robinhood") {
+      return '<a href="https://robinhoodchain.blockscout.com/token/' + encodeURIComponent(c.mint) + '" target="_blank" rel="noopener" style="color:var(--textDim);">scan</a> \u00b7 ' +
+        '<a href="https://www.geckoterminal.com/robinhood/tokens/' + encodeURIComponent(c.mint) + '" target="_blank" rel="noopener" style="color:var(--textDim);">gt</a> \u00b7 ' +
+        '<a href="https://dexscreener.com/robinhood/' + encodeURIComponent(c.mint) + '" target="_blank" rel="noopener" style="color:var(--textDim);">dex</a>';
+    }
+    return '<a href="https://pump.fun/coin/' + encodeURIComponent(c.mint) + '" target="_blank" rel="noopener" style="color:var(--textDim);">pump</a> \u00b7 ' +
+      '<a href="https://dexscreener.com/solana/' + encodeURIComponent(c.mint) + '" target="_blank" rel="noopener" style="color:var(--textDim);">dex</a>';
+  }
   function earlyCardHTML(c) {
+    var q = c.quoteSymbol || (c.chain === "robinhood" ? "ETH" : "SOL");
+    var rh = c.chain === "robinhood";
     var bad = (c.hardNegatives || []).length > 0;
     var sig = c.signals && (c.signals.early_curve || c.signals.final_stretch);
     var sc = c.earlyScore;
@@ -953,8 +1008,15 @@
     if (c.devSold) badges.push('<span class="mono tag" style="color:#fff; background:var(--rust); border-color:var(--rust);" title="The creator sold ' + fmtN(c.devSoldPct, 0) + '% of what it bought \u2014 hard negative">DEV SOLD ' + fmtN(c.devSoldPct, 0) + "%</span>");
     if (c.brand) badges.push('<span class="mono tag" style="color:var(--rust); border-color:var(--rust);" title="Brand / celebrity name: almost always a copy, not the real thing">\u2122 BRAND: ' + esc(c.brand) + "</span>");
     if (c.smartBuyers > 0) badges.push('<span class="mono tag" style="color:var(--teal); border-color:var(--teal);" title="Wallets with 2+ past early entries into $100k+ coins (confirmation only)">\uD83E\uDDE0 SMART \u00d7' + c.smartBuyers + "</span>");
-    if (c.convictionBuys > 0) badges.push('<span class="mono tag" style="color:var(--gold); border-color:var(--gold);" title="Single buy \u2265 4.5 SOL before ~$8k mcap">\uD83D\uDCAA CONVICTION ' + fmtN(c.largestConvictionSol, 1) + " SOL</span>");
-    else if (c.convictionSoftBuys > 0) badges.push('<span class="mono tag" title="Single buy \u2265 2.8 SOL before ~$8k mcap">\uD83D\uDCAA soft ' + fmtN(c.largestConvictionSol, 1) + " SOL</span>");
+    if (c.convictionBuys > 0) badges.push('<span class="mono tag" style="color:var(--gold); border-color:var(--gold);" title="Single buy \u2265 ' + (rh ? "0.35 ETH" : "4.5 SOL") + ' before ~$8k mcap">\uD83D\uDCAA CONVICTION ' + fmtN(c.largestConvictionSol, rh ? 2 : 1) + " " + q + "</span>");
+    else if (c.convictionSoftBuys > 0) badges.push('<span class="mono tag" title="Single buy \u2265 ' + (rh ? "0.22 ETH" : "2.8 SOL") + ' before ~$8k mcap">\uD83D\uDCAA soft ' + fmtN(c.largestConvictionSol, rh ? 2 : 1) + " " + q + "</span>");
+    if (rh && c.venue) badges.push('<span class="mono tag" title="Launch venue on Robinhood Chain">' + esc(c.venue === "pons-v2" ? "Pons" : c.venue === "doppler" ? "Doppler" : "Uni v4") + "</span>");
+    if (c.safety) {
+      var sv = c.safety.verdict;
+      var scol = sv === "danger" ? "var(--rust)" : sv === "warn" || sv === "pending" ? "var(--gold)" : sv === "ok" ? "var(--teal)" : "var(--textDim)";
+      badges.push('<span class="mono tag" style="color:' + scol + "; border-color:" + scol + ';" title="EVM token safety (' + esc(c.safety.source || "pending") + "): " + esc((c.safety.flags || []).join(", ") || "no flags") + '">' + (sv === "danger" ? "\u26D4 " : sv === "ok" ? "\u2705 " : "\u26A0 ") + esc(sv === "pending" ? "safety pending" : "safety " + sv) + "</span>");
+    }
+    if (c.buyFeePct != null && rh && c.buyFeePct > 3) badges.push('<span class="mono tag" title="Fee charged on the last buy (Pons anti-snipe tax decays after launch)">buy fee ' + fmtN(c.buyFeePct, 1) + "%</span>");
     (c.matchedMetas || []).slice(0, 2).forEach(function (m) { badges.push('<span class="mono tag" title="Active theme across several creators">#' + esc(m.meta || m) + "</span>"); });
     if (c.aboutToGraduate) badges.push('<span class="mono tag" style="color:var(--gold); border-color:var(--gold);">\uD83C\uDF93 ABOUT TO BOND</span>');
     if (c.openPositions && c.openPositions.length) badges.push('<span class="mono tag" style="color:var(--teal); border-color:var(--teal);">\uD83E\uDDEA PAPER OPEN</span>');
@@ -968,36 +1030,37 @@
     var title = "Early score " + (sc == null ? "?" : sc) + (c.hardNegatives && c.hardNegatives.length ? " \u2014 HARD NEGATIVE: " + c.hardNegatives.join(", ") : "") +
       (c.blockers && c.blockers.length ? "\nBlockers: " + c.blockers.map(function (b) { return EARLY_BLOCKER_LABEL[b] || b; }).join(", ") : "") +
       "\nBuy ratio " + fmtN(c.buyRatio, 2) + " \u00b7 1m vol buy share " + fmtN(c.buyRatio1mVol, 2) + " \u00b7 repeat buyers " + fmtN(c.repeatBuyerPct, 0) + "%" +
-      "\nTraders/SOL " + fmtN(c.tradersPerSol, 1) + " \u00b7 size CV " + fmtN(c.tradeSizeCv, 2) + " \u00b7 vol/mcap 1m " + fmtN(c.volMcapPct1m, 1) + "% \u00b7 " + fmtN(c.avgSecBetweenSwaps, 1) + "s between swaps" +
+      "\nTraders/" + q + " " + fmtN(c.tradersPerSol, 1) + " \u00b7 size CV " + fmtN(c.tradeSizeCv, 2) + " \u00b7 vol/mcap 1m " + fmtN(c.volMcapPct1m, 1) + "% \u00b7 " + fmtN(c.avgSecBetweenSwaps, 1) + "s between swaps" +
       "\nTime to $10k " + fmtSec(c.timeTo10kSec) + " \u00b7 $20k " + fmtSec(c.timeTo20kSec) + " \u00b7 dev buy " + fmtN(c.devBuyPct, 1) + "%" +
-      (c.freshCluster5m ? "\nFresh-wallet cluster: " + c.freshCluster5m + " in 5m (" + fmtN(c.freshCluster5mSol, 1) + " SOL)" : "") +
+      (c.freshCluster5m ? "\nFresh-wallet cluster: " + c.freshCluster5m + " in 5m (" + fmtN(c.freshCluster5mSol, rh ? 2 : 1) + " " + q + ")" : "") +
       (Object.keys(comps).length ? "\nComponents: " + Object.keys(comps).map(function (k) { return k + " " + comps[k]; }).join(", ") : "") +
       "\n" + c.mint;
     return '<div class="ecard' + (sig ? " sig" : "") + (bad ? " bad" : "") + '" title="' + esc(title) + '" data-mint="' + esc(c.mint) + '">' +
-      '<div class="top"><span class="sym">' + esc(c.symbol || c.name || c.mint.slice(0, 6)) + '</span><span class="mc mono">' + fmtK(c.mcapUsd) + '</span>' +
+      '<div class="top"><span class="sym">' + chainBadgeHTML(c.chain) + " " + esc(c.symbol || c.name || c.mint.slice(0, 6)) + '</span><span class="mc mono">' + fmtK(c.mcapUsd) + '</span>' +
       '<span class="score mono ' + scCls + '" title="Early score 0-100">' + (sc == null ? "\u00b7" : Math.round(sc)) + "</span></div>" +
-      '<div class="pbar" title="Bonding-curve progress ' + (prog == null ? "?" : prog + "%") + (c.standardCurve === false ? " (custom curve, token basis; completes near " + fmtK(c.gradMcapUsd) + ")" : c.progressTokens != null ? " (pump.fun token basis " + Math.round(c.progressTokens * 100) + "%)" : "") + '"><span style="width:' + (prog || 0) + '%"></span></div>' +
+      '<div class="pbar" title="' + (rh && c.venue !== "pons-v2" ? "Pool launch \u2014 no bonding curve" : "Bonding-curve progress " + (prog == null ? "?" : prog + "%")) + (rh ? (c.venue === "pons-v2" ? " (Pons: ETH raised / 4.2 ETH, completes near " + fmtK(c.gradMcapUsd) + ")" : "") : c.standardCurve === false ? " (custom curve, token basis; completes near " + fmtK(c.gradMcapUsd) + ")" : c.progressTokens != null ? " (pump.fun token basis " + Math.round(c.progressTokens * 100) + "%)" : "") + '"><span style="width:' + (prog || 0) + '%"></span></div>' +
       '<div class="egrid mono">' +
         "<span>age " + v(fmtSec(c.ageSec)) + "</span>" +
         "<span>prog " + v(prog == null ? "?" : prog + "%") + "</span>" +
         "<span>buy/m " + v(fmtN(c.buyersPerMin, 0)) + "</span>" +
-        "<span>netSOL/m " + v(fmtN(c.netSolPerMin, 1), c.netSolPerMin < 0 ? "neg" : c.netSolPerMin > 3 ? "pos" : "") + "</span>" +
+        "<span>net" + q + "/m " + v(fmtN(c.netSolPerMin, rh ? 2 : 1), c.netSolPerMin < 0 ? "neg" : c.netSolPerMin > (rh ? 0.25 : 3) ? "pos" : "") + "</span>" +
         "<span>buyers " + v(c.uniqueBuyers == null ? "\u00b7" : c.uniqueBuyers) + "</span>" +
         '<span title="First 10 buyers still holding \u226550% of what they bought">1st10 ' + v((c.first10Holding == null ? "?" : c.first10Holding) + "/" + (c.first10Count || 0), c.first10Sold >= 5 ? "neg" : "") + "</span>" +
-        '<span title="Creator + same-slot buyers: % of supply bought at launch \u2192 % still held">bndl ' + v(fmtN(c.bundleLaunchPct, 1) + "\u2192" + fmtN(c.bundleNowPct, 1) + "%", c.bundleLaunchPct > 5 ? "neg" : "") + "</span>" +
-        '<span title="Bought in the first 3 slots, % of supply">snipe ' + v(fmtN(c.sniperPct, 0) + "%", c.sniperPct > 25 ? "neg" : "") + "</span>" +
+        '<span title="' + (rh ? "Creator + same-block buyers (and wallets exempted from the snipe tax at launch)" : "Creator + same-slot buyers") + ': % of supply bought at launch \u2192 % still held">bndl ' + v(fmtN(c.bundleLaunchPct, 1) + "\u2192" + fmtN(c.bundleNowPct, 1) + "%", c.bundleLaunchPct > 5 ? "neg" : "") + "</span>" +
+        '<span title="' + (rh ? "Bought in the first 3 blocks (~0.3s on Robinhood Chain)" : "Bought in the first 3 slots") + ', % of supply">snipe ' + v(fmtN(c.sniperPct, 0) + "%", c.sniperPct > 25 ? "neg" : "") + "</span>" +
         "<span>top10 " + v(fmtN(c.top10Pct, 0) + "%", c.top10Pct > 35 ? "neg" : "") + "</span>" +
         "<span>dev " + v(fmtN(c.devPct, 1) + "%", c.devSold ? "neg" : "") + "</span>" +
         "<span>lrg " + v(fmtN(c.largestBuyerPct, 1) + "%", c.largestBuyerPct > 8 ? "neg" : "") + "</span>" +
         '<span title="Smart-money wallets that bought">smart ' + v(c.smartBuyers || 0, c.smartBuyers > 0 ? "pos" : "") + "</span>" +
-        '<span title="First ~20 buyers: fresh / dormant (10d+) / KYC (exchange-funded)" style="grid-column: span 2;">fund ' + fund + "</span>" +
+        (rh
+          ? '<span title="First ~20 buyers: fresh wallets (nonce \u2264 3) / contract wallets. Funding source and wallet age are not available keylessly on Robinhood Chain." style="grid-column: span 2;">fund ' + (c.fundingChecked > 0 ? v(c.freshBuyers + " fresh / " + (c.contractWallets || 0) + " sc") : "<b>\u00b7</b>") + "</span>"
+          : '<span title="First ~20 buyers: fresh / dormant (10d+) / KYC (exchange-funded)" style="grid-column: span 2;">fund ' + fund + "</span>") +
         '<span title="Deployer wallet age \u00b7 CEX-funded \u00b7 % of prior launches drained">dep ' + dep + "</span>" +
       "</div>" +
       (badges.length ? '<div class="ebadges">' + badges.join("") + "</div>" : "") +
       (!sig && c.blockers && c.blockers.length ? '<div class="ebl mono">\u21B3 ' + c.blockers.slice(0, 4).map(function (b) { return esc(EARLY_BLOCKER_LABEL[b] || b); }).join(" \u00b7 ") + "</div>" : "") +
       '<div class="ebl mono"><button class="ca-btn" data-ca="' + esc(c.mint) + '" style="font-size:0.56rem;">' + esc(c.mint.slice(0, 4) + "\u2026" + c.mint.slice(-4)) + "</button> " +
-        '<a href="https://pump.fun/coin/' + encodeURIComponent(c.mint) + '" target="_blank" rel="noopener" style="color:var(--textDim);">pump</a> \u00b7 ' +
-        '<a href="https://dexscreener.com/solana/' + encodeURIComponent(c.mint) + '" target="_blank" rel="noopener" style="color:var(--textDim);">dex</a></div>' +
+        earlyLinksHTML(c) + "</div>" +
       "</div>";
   }
   function renderEarlyScanner(board, cfg) {
@@ -1008,30 +1071,40 @@
       document.getElementById("early-atg").innerHTML = "";
       return;
     }
+    renderChainToggles();
     var cols = [["new", "NEW"], ["early_signal", "EARLY SIGNAL"], ["final_stretch", "FINAL STRETCH"], ["graduated", "GRADUATED"]];
-    body.innerHTML = cols.map(function (c) {
-      var list = board.columns[c[0]] || [];
+    var chains = board.chains || ["solana"];
+    var chainOff = earlyChain !== "all" && chains.indexOf(earlyChain) < 0;
+    body.innerHTML = chainOff
+      ? '<div class="empty mono" style="grid-column:1/-1;">The worker isn\'t tracking ' + CHAIN_LABEL[earlyChain] + " right now (CHAINS_ENABLED=" + esc(chains.join(",")) + ").</div>"
+      : cols.map(function (c) {
+      var list = (board.columns[c[0]] || []).filter(chainMatch).slice(0, 24);
       return '<div class="pulse-col"><h4>' + c[1] + ' <span class="n">' + list.length + "</span></h4>" +
         (list.length ? list.map(earlyCardHTML).join("") : '<div class="mono" style="color:var(--textDim); font-size:0.62rem;">Nothing here right now.</div>') + "</div>";
     }).join("");
     attachCopyHandlers(body);
-    var atg = board.aboutToGraduate || [];
+    var atg = (board.aboutToGraduate || []).filter(chainMatch);
     document.getElementById("early-atg").innerHTML = atg.length
       ? '<div class="atg mono"><span style="border:none; color:var(--gold);">\uD83C\uDF93 About to graduate:</span>' + atg.map(function (a) {
-          return "<span>" + esc(a.symbol || a.mint.slice(0, 6)) + " " + Math.round((a.progress || 0) * 100) + "% \u00b7 " + fmtK(a.mcapUsd) + " \u00b7 " + fmtN(a.buyersPerMin, 0) + " buy/m</span>";
+          return "<span>" + chainBadgeHTML(a.chain) + " " + esc(a.symbol || a.mint.slice(0, 6)) + " " + Math.round((a.progress || 0) * 100) + "% \u00b7 " + fmtK(a.mcapUsd) + " \u00b7 " + fmtN(a.buyersPerMin, 0) + " buy/m</span>";
         }).join("") + "</div>"
       : "";
-    var st = board.stats || {};
-    document.getElementById("early-meta").textContent = "tracking " + (board.tracked || 0) + " \u00b7 signals " + ((st.signals || {}).early_curve || 0) + " early / " + ((st.signals || {}).final_stretch || 0) + " stretch \u00b7 SOL $" + (board.solUsd ? Number(board.solUsd).toFixed(2) : "?");
+    var sub = earlyChain !== "all" && board.byChain && board.byChain[earlyChain] ? board.byChain[earlyChain] : board;
+    var st = sub.stats || {};
+    var qu = board.quoteUsd || { solana: board.solUsd };
+    document.getElementById("early-meta").textContent = "tracking " + (sub.tracked || 0) + " \u00b7 signals " + ((st.signals || {}).early_curve || 0) + " early / " + ((st.signals || {}).final_stretch || 0) + " stretch" +
+      (qu.solana ? " \u00b7 SOL $" + Number(qu.solana).toFixed(2) : "") + (qu.robinhood ? " \u00b7 ETH $" + Math.round(qu.robinhood) : "");
     document.getElementById("early-timestamp").textContent = "Scanner snapshot " + new Date(board.generatedAt).toLocaleTimeString() +
-      (cfg ? " \u00b7 window " + fmtK(cfg.minMcapUsd) + "\u2013" + fmtK(cfg.maxMcapUsd) + ", min age " + cfg.minAgeSec + "s, min score " + cfg.minScore + ", max bundle " + cfg.maxBundlePct + "%" : "") + ".";
+      (cfg && earlyChain !== "robinhood" ? " \u00b7 Solana window " + fmtK(cfg.minMcapUsd) + "\u2013" + fmtK(cfg.maxMcapUsd) + ", min age " + cfg.minAgeSec + "s, min score " + cfg.minScore + ", max bundle " + cfg.maxBundlePct + "%" : "") +
+      (cfg && cfg.robinhood && earlyChain !== "solana" ? " \u00b7 Robinhood window " + fmtK(cfg.robinhood.minMcapUsd) + "\u2013" + fmtK(cfg.robinhood.maxMcapUsd) + ", \u2265" + cfg.robinhood.minBuyersPerMin + " buyers/min, \u2265" + cfg.robinhood.minNetSolPerMin + " ETH/min net, feed " + (cfg.robinhood.ws ? "WS + " : "") + "eth_getLogs polling" : "") + ".";
   }
 
   // ---------- Early-curve paper ----------
   var EXIT_LABEL = { tp_25k: "TP $25k", bond: "bond", ladder_complete: "ladder done", trailing_stop: "trailing stop", hard_stop: "hard stop", time_stop: "time stop", max_hold: "max hold",
     dev_sold: "dev sold", cohort_selldown: "cohort dump", first10_selldown: "first-10 selling", rugged: "rugged", liquidity_pull: "liquidity pulled", dead_curve: "dead curve", worker_restart: "worker restart" };
-  function earlyStatsHTML(name, s) {
+  function earlyStatsHTML(name, s, quote) {
     if (!s) return "";
+    quote = quote || "SOL";
     var cell = function (k, v, t) { return '<div title="' + esc(t || "") + '"><div class="k mono">' + k + '</div><div class="v mono">' + v + "</div></div>"; };
     var pct = function (v) { return v == null ? "\u00b7" : v + "%"; };
     var x = function (v) { return v == null ? "\u00b7" : Number(v).toFixed(2) + "\u00d7"; };
@@ -1040,17 +1113,17 @@
     return '<div class="mono" style="margin-top:0.8rem; color:var(--gold); font-size:0.72rem;">' + name + " \u2014 " + (s.closed || 0) + " closed, " + (s.open || 0) + " open, " + (s.unfilled || 0) + " unfilled</div>" +
       '<div class="estats">' +
       cell("Win rate", pct(s.winRatePct), "Closed with profit after fees + slippage") +
-      cell("2\u00d7 realized", pct(s.win2xPct), "Closed at \u22652\u00d7 the SOL put in") +
+      cell("2\u00d7 realized", pct(s.win2xPct), "Closed at \u22652\u00d7 the " + quote + " put in") +
       cell("Peak \u22653\u00d7", pct(s.hit3xPct), "Price reached 3\u00d7 the effective entry at some point") +
       cell("Peak \u226510\u00d7", pct(s.hit10xPct)) +
       cell("Hit $100k", pct(s.hit100kPct), "Market cap reached $100k while held") +
       cell("Sustained $100k", pct(s.sustained100kPct), "\u2265$100k for 180s while a 0.5 SOL exit cost \u226415%") +
       cell("Median peak", x(s.medianPeakMultiple)) +
-      cell("Median exit", x(s.medianRealizedMultiple), "SOL out / SOL in") +
+      cell("Median exit", x(s.medianRealizedMultiple), quote + " out / " + quote + " in") +
       cell("Median hold", fmtSec(s.medianHoldSec)) +
       cell("Time to peak", fmtSec(s.medianTimeToPeakSec)) +
       cell("Fill rate", pct(s.fillRatePct), "Signals that could be bought within the entry grace") +
-      cell("Net SOL", (s.sumPnlSol >= 0 ? "+" : "") + Number(s.sumPnlSol || 0).toFixed(2), "Sum over closed trades, 0.5 SOL each") +
+      (s.sumPnlSol == null ? "" : cell("Net " + quote, (s.sumPnlSol >= 0 ? "+" : "") + Number(s.sumPnlSol || 0).toFixed(quote === "ETH" ? 3 : 2), "Sum over closed trades, " + (quote === "ETH" ? "0.05 ETH" : "0.5 SOL") + " each")) +
       "</div>" +
       (reasons ? '<div class="mono" style="font-size:0.6rem; color:var(--textDim); margin-top:0.35rem;">Exits: ' + esc(reasons) + "</div>" : "") +
       (s.timeBlocks && s.timeBlocks.length ? '<div class="mono" style="font-size:0.6rem; color:var(--textDim); margin-top:0.2rem;" title="Same stats in time order, oldest first \u2014 a stable edge should not live in one block">Time-ordered thirds: ' +
@@ -1059,23 +1132,32 @@
   async function renderEarlyPaper(ep) {
     var statsEl = document.getElementById("early-paper-stats");
     if (!statsEl) return;
-    statsEl.innerHTML = ep ? earlyStatsHTML("EARLY SIGNAL entries (early_curve)", ep.early_curve) + earlyStatsHTML("FINAL STRETCH entries", ep.final_stretch) +
+    renderChainToggles();
+    var byChain = (ep && ep.byChain) || (ep ? { solana: { early_curve: ep.early_curve, final_stretch: ep.final_stretch } } : {});
+    var showChains = earlyChain === "all" ? Object.keys(byChain) : [earlyChain];
+    statsEl.innerHTML = ep ? showChains.map(function (ch) {
+        var b = byChain[ch];
+        if (!b) return '<div class="empty mono" style="margin-top:0.6rem;">No ' + CHAIN_LABEL[ch] + " paper stats (chain not enabled on the worker).</div>";
+        var q = ch === "robinhood" ? "ETH" : "SOL";
+        return earlyStatsHTML(chainBadgeHTML(ch) + " EARLY SIGNAL entries (early_curve)", b.early_curve, q) + earlyStatsHTML(chainBadgeHTML(ch) + " FINAL STRETCH entries", b.final_stretch, q);
+      }).join("") +
       (ep.exitPlan && ep.exitPlan.early_curve ? '<div class="mono" style="font-size:0.6rem; color:var(--textDim); margin-top:0.5rem;">Exit plan: ' + esc((ep.exitPlan.early_curve.ladder || []).join(", ")) + ", trail " + ep.exitPlan.early_curve.trailPct + "%, hard stop " + ep.exitPlan.early_curve.hardStopPct + "%, time stop " + ep.exitPlan.early_curve.timeStopMin + "m. Last " + (ep.windowDays || 7) + " days.</div>" : "")
       : '<div class="empty mono">No early-curve paper stats yet.</div>';
     var bodyEl = document.getElementById("early-paper-body");
     try {
       var res = await fetch(SUPABASE_URL + "/rest/v1/auspex_paper_trades?entry_kind=in.(early_curve,final_stretch)&order=entry_time.desc&limit=25" +
-        "&select=mint,symbol,entry_kind,entry_time,status,outcome,entry_mcap_usd,eff_entry_mcap_usd,peak_mcap_usd,peak_multiple,realized_multiple,final_pnl_pct,exit_reason,time_to_peak_sec,hold_sec,sustained_100k,excluded_from_stats",
+        (earlyChain !== "all" ? "&chain_id=eq." + encodeURIComponent(earlyChain) : "") +
+        "&select=chain_id,mint,symbol,entry_kind,entry_time,status,outcome,entry_mcap_usd,eff_entry_mcap_usd,peak_mcap_usd,peak_multiple,realized_multiple,final_pnl_pct,exit_reason,time_to_peak_sec,hold_sec,sustained_100k,excluded_from_stats",
         { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY } });
       if (!res.ok) throw new Error("Status " + res.status);
       var rows = await res.json();
-      if (!rows.length) { bodyEl.innerHTML = '<div class="empty mono">No early-curve paper trades yet \u2014 they open when an EARLY SIGNAL fires.</div>'; return; }
+      if (!rows.length) { bodyEl.innerHTML = '<div class="empty mono">No ' + (earlyChain === "all" ? "" : CHAIN_LABEL[earlyChain] + " ") + 'early-curve paper trades yet \u2014 they open when an EARLY SIGNAL fires.</div>'; return; }
       var th = ["Token", "Kind", "Entry", "Peak", "Exit", "PnL", "Reason", "Peak at", "Held"];
       bodyEl.innerHTML = '<div style="overflow-x:auto;"><table class="perf"><thead><tr>' + th.map(function (h) { return "<th>" + h + "</th>"; }).join("") + "</tr></thead><tbody>" +
         rows.map(function (r) {
           var pnl = r.final_pnl_pct != null ? Number(r.final_pnl_pct) : null;
           var open = r.status === "open";
-          return "<tr" + (r.excluded_from_stats ? ' class="small" title="Excluded from stats"' : "") + "><td>" + esc(r.symbol || r.mint.slice(0, 6)) + "</td><td>" + (r.entry_kind === "early_curve" ? "early" : "stretch") + "</td>" +
+          return "<tr" + (r.excluded_from_stats ? ' class="small" title="Excluded from stats"' : "") + "><td>" + chainBadgeHTML(r.chain_id) + " " + esc(r.symbol || r.mint.slice(0, 6)) + "</td><td>" + (r.entry_kind === "early_curve" ? "early" : "stretch") + "</td>" +
             "<td>" + fmtK(r.eff_entry_mcap_usd || r.entry_mcap_usd) + "</td><td>" + fmtK(r.peak_mcap_usd) + (r.peak_multiple ? ' <span class="sub">' + Number(r.peak_multiple).toFixed(1) + "\u00d7</span>" : "") + (r.sustained_100k ? " \u2705" : "") + "</td>" +
             "<td>" + (r.realized_multiple != null ? Number(r.realized_multiple).toFixed(2) + "\u00d7" : open ? "open" : r.outcome === "unfilled" ? "unfilled" : "\u00b7") + "</td>" +
             '<td class="' + (pnl == null ? "" : pnl >= 0 ? "pos" : "neg") + '">' + (pnl == null ? "\u00b7" : (pnl >= 0 ? "+" : "") + pnl.toFixed(0) + "%") + "</td>" +
@@ -1114,6 +1196,7 @@
       renderLaunchedPanel(payload.justLaunched || [], payload.badActorSources || []);
       renderGraduatedPanel(payload.justGraduated || []);
       renderPerfPanel(payload.signalPerformance || null);
+      lastEarlyPayload = { earlyScanner: payload.earlyScanner || null, earlyConfig: payload.earlyConfig || null, earlyPaper: payload.earlyPaper || null };
       renderEarlyScanner(payload.earlyScanner || null, payload.earlyConfig || null);
       renderEarlyPaper(payload.earlyPaper || null);
 
@@ -1911,9 +1994,10 @@
     if (!address) return;
 
     btn.textContent = "SCANNING…";
-    resultEl.innerHTML = '<div class="dim-note">Checking Solana and Base…</div>';
+    resultEl.innerHTML = '<div class="dim-note">Checking Solana and Robinhood Chain…</div>';
 
-    var CHAINS_TO_TRY = ["solana", "base"];
+    // 0x… = EVM (Robinhood Chain), anything else = Solana base58
+    var CHAINS_TO_TRY = /^0x[0-9a-fA-F]{40}$/.test(address) ? ["robinhood"] : ["solana"];
     var found = null;
 
     try {
@@ -1929,10 +2013,24 @@
         }
       }
 
+      // Robinhood bonding-curve tokens (Pons) are on GeckoTerminal before DexScreener indexes them
+      if (!found && CHAINS_TO_TRY[0] === "robinhood") {
+        try {
+          var gtRes = await fetch("https://api.geckoterminal.com/api/v2/networks/robinhood/tokens/" + encodeURIComponent(address.toLowerCase()) + "/pools?page=1");
+          if (gtRes.ok) {
+            var gtPools = ((await gtRes.json()) || {}).data || [];
+            if (gtPools.length) {
+              var ga = gtPools[0].attributes || {};
+              found = { chain: "robinhood", pair: { baseToken: { name: (ga.name || "").split(" / ")[0], symbol: (ga.name || "").split(" / ")[0] }, priceUsd: ga.base_token_price_usd, liquidity: { usd: ga.reserve_in_usd }, volume: { h24: (ga.volume_usd || {}).h24 }, priceChange: { h24: (ga.price_change_percentage || {}).h24 }, url: "https://www.geckoterminal.com/robinhood/pools/" + ga.address } };
+            }
+          }
+        } catch (e) {}
+      }
+
       btn.textContent = "SCAN";
 
       if (!found) {
-        resultEl.innerHTML = '<div class="dim-note">No DexScreener pair found on Solana or Base for this address — check it\'s correct, or it may be too new / on a chain we don\'t cover.</div>';
+        resultEl.innerHTML = '<div class="dim-note">No DexScreener / GeckoTerminal pair found on Solana or Robinhood Chain for this address — check it\'s correct, or it may be too new / on a chain we don\'t cover.</div>';
         return;
       }
 
@@ -1963,6 +2061,29 @@
       "</div>";
       resultEl.innerHTML = html;
 
+      if (found.chain === "robinhood") {
+        var gpEl = document.getElementById("scan-rugcheck");
+        gpEl.innerHTML = '<div class="dim-note" style="margin-top:0;">Running GoPlus token security (Robinhood Chain)…</div>';
+        try {
+          var gpRes = await fetch("https://api.gopluslabs.io/api/v1/token_security/4663?contract_addresses=" + encodeURIComponent(address.toLowerCase()));
+          var gp = gpRes.ok ? (((await gpRes.json()) || {}).result || {})[address.toLowerCase()] : null;
+          if (!gp) gpEl.innerHTML = '<div class="dim-note" style="margin-top:0;">GoPlus has no report for this token yet (normal for brand-new launches).</div>';
+          else {
+            var gpFlags = [];
+            if (gp.is_honeypot === "1") gpFlags.push("HONEYPOT");
+            if (gp.cannot_sell_all === "1") gpFlags.push("can't sell all");
+            if (gp.is_mintable === "1") gpFlags.push("mintable");
+            if (gp.is_blacklisted === "1") gpFlags.push("blacklist");
+            if (gp.hidden_owner === "1") gpFlags.push("hidden owner");
+            if (gp.is_open_source === "0") gpFlags.push("unverified source");
+            var tax = (gp.buy_tax !== "" && gp.buy_tax != null ? "buy " + Math.round(Number(gp.buy_tax) * 100) + "%" : "buy ?") + " / " + (gp.sell_tax !== "" && gp.sell_tax != null ? "sell " + Math.round(Number(gp.sell_tax) * 100) + "%" : "sell ?");
+            var danger = gp.is_honeypot === "1" || gp.cannot_sell_all === "1" || Number(gp.sell_tax) > 0.1;
+            gpEl.innerHTML = '<div class="mono" style="font-size:0.8rem; color:' + (danger ? "var(--rust)" : gpFlags.length ? "var(--gold)" : "var(--teal)") + ';">GoPlus: ' + esc(tax) + (gpFlags.length ? " \u00b7 " + esc(gpFlags.join(", ")) : " \u00b7 no red flags reported") + "</div>";
+          }
+        } catch (e) {
+          gpEl.innerHTML = '<div class="dim-note" style="margin-top:0;">GoPlus check failed (' + esc(e.message) + ").</div>";
+        }
+      }
       if (found.chain === "solana") {
         var rcEl = document.getElementById("scan-rugcheck");
         rcEl.innerHTML = '<div class="dim-note" style="margin-top:0;">Running RugCheck…</div>';
